@@ -1,7 +1,5 @@
 "use strict";
 
-var counter = 0;
-
 var State = Object.freeze({
     NEW: "NEW",
     READY: "READY",
@@ -10,193 +8,211 @@ var State = Object.freeze({
     TERMINATED: "TERMINATED"
 });
 
-function ControlBlock(pid, pc, state, registers) {
+function Registers() {
+    this.eax = 0;
+    this.ebx = 0;
+    this.eip = 0;
+    this.zf = false;
+}
+
+function Program(instructions, labels) {
+    this.instructions = instructions;
+    this.labels = labels;
+}
+
+function Process(pid, ppid, program) {
     this.pid = pid;
-    this.pc = pc;
-    this.state = state;
-    this.registers = registers;
-}
-
-function Process(controlBlock, program) {
-    this.controlBlock = controlBlock;
+    this.ppid = ppid;
     this.program = program;
+    this.state = State.NEW;
+    this.registers = new Registers();
 }
 
-var Computer = {
-    cpus: {},
-    allProcesses: {},
-    readyQueue: [],
-    waiting: []
+function Subtract(l, r) {
+    this.l = l;
+    this.r = r;
+}
+
+Subtract.prototype.execute = function(process) {
+    var r = isNaN(this.r) ? process.registers[this.r] : parseInt(this.r);
+    process.registers[this.l] -= r;
+    process.registers.zf = process.registers[this.l] === 0;
 };
 
-Computer.createProcess = function(process) {
-    this.allProcesses[process.controlBlock.pid] = process;
+function Move(l, r) {
+    this.l = l;
+    this.r = r;
 }
 
-Computer.blockProcess = function(pid) {
-    for (var cpu in this.cpus) {
-        if (this.cpus[cpu].controlBlock.pid === pid) {
-            var process = this.cpus[cpu];
-            this.cpus[cpu] = null;
-            process.state = State.WAITING;
-            this.waiting.push(process);
-            break;
-        }
-    }
+Move.prototype.execute = function(process) {
+    process.registers[this.l] = isNaN(this.r) ? process.registers[this.r] : parseInt(this.r);
+};
+
+function Jump(label) {
+    this.label = label;
 }
 
-Computer.wakeProcess = function(pid) {
-    for (var i = 0; i < this.waiting.length; ++i) {
-        if (this.waiting[i].controlBlock.pid === pid) {
-            var process = this.waiting[i];
-            this.waiting.splice(i, 1);
-            process.state = State.READY;
-            this.readyQueue.push(process);
-            break;
-        }
-    }
-}
-
-Computer.doCycle = function() {
-    while (this.readyQueue.length !== 0) {
-        var assigned = false;
-        for (var cpu in this.cpus) {
-            if (!this.cpus[cpu]) {
-                this.cpus[cpu] = this.readyQueue[0];
-                this.readyQueue.splice(0, 1);
-                assigned = true;
-                break;
-            }
-        }
-        if (!assigned) {
-            break;
-        }
-    }
-
-    for (var cpu in this.cpus) {
-        var process = this.cpus[cpu];
-        if (process) {
-            if (process.controlBlock.pc < process.program.length) {
-                process.program[process.controlBlock.pc].execute(process);
-            } else {
-                this.cpus[cpu] = null;
-                process.controlBlock.state = State.TERMINATED;
-            }
-        }
-    }
-
-    for (var i = 0; i < this.waiting.length; ++i) {
-        if (this.waiting[i].wakeCondition()) {
-            this.wakeProcess(this.waiting[i].ControlBlock.pid);
-        }
-    }
-
-    for (var pid in this.allProcesses) {
-        var controlBlock = this.allProcesses[pid].controlBlock;
-        if (controlBlock.state === State.NEW) {
-            controlBlock.state = State.READY;
-            this.readyQueue.push(this.allProcesses[pid]);
-        }
-    }
-
-    for (var i = 0; i < domElements.length; ++i) {
-        domElements[i].update();
-    }
-}
-
-function Instruction() {
-    if (this.constructor === Instruction) {
-        throw new Error("Cannot instantiate abstract class!");
-    }
-}
-
-Instruction.prototype.execute = function() {
-    throw new Error("Abstract method!");
-}
-
-function Sleep(cycles) {
-    this.cycles = cycles;
-}
-
-Sleep.prototype = Object.create(Instruction.prototype);
-Sleep.prototype.constructor = Sleep;
-Sleep.prototype.execute = function(process) {
-    var registers = process.controlBlock.registers;
-    if (registers.hasOwnProperty("sleep")) {
-        if (registers.sleep) {
-            --registers.sleep
-        } else {
-            delete registers.sleep;
-            ++process.controlBlock.pc;
-        }
-    } else {
-        registers.sleep = this.cycles - 1;
-    }
-}
-
-function Fork() {}
-
-Fork.prototype = Object.create(Instruction.prototype);
-Fork.prototype.constructor = Fork;
-Fork.prototype.execute = function(process) {
-    var pid = counter++;
-    var registers = JSON.parse(JSON.stringify(process.controlBlock.registers));
-    process.controlBlock.registers.return = pid;
-    registers.return = 0;
-    var forkedControlBlock = new ControlBlock(pid, ++process.controlBlock.pc, State.NEW, registers);
-    var process = new Process(forkedControlBlock, program);
-    Computer.createProcess(process);
-}
-
-function Wait(pid) {
-    this.pid = pid;
-}
-
-Wait.prototype = Object.create(Instruction.prototype);
-Wait.prototype.constructor = Wait;
-Wait.prototype.execute = function(process) {
-    var waitProcess = Computer.allProcesses[this.pid];
-    if (waitProcess) {
-        var state = waitProcess.controlBlock.state;
-        if (state === State.TERMINATED) {
-            delete Computer.allProcesses[this.pid];
-            ++process.controlBlock.pc;
-        } else {
-            process.wakeCondition = function() {
-                var waitProcess = Computer.allProcesses[this.pid];
-                return !waitProcess || waitProcess.controlBlock.state === State.TERMINATED;
-            }
-            Computer.blockProcess(process.controlBlock.pid);
-        }
-    } else {
-        ++process.controlBlock.pc;
-    }
-}
-
-function Jump(n) {
-    this.n = n;
-}
-
-Jump.prototype = Object.create(Instruction.prototype);
-Jump.prototype.constructor = Jump;
 Jump.prototype.execute = function(process) {
-    process.controlBlock.pc += this.n + 1;
+    process.registers.eip = process.program.labels[this.label];
+};
+
+function JumpIfEqual(label) {
+    this.label = label;
 }
 
-function JumpIf(n, register) {
-    Jump.call(this, n);
-    this.register = register;
-}
-
-JumpIf.prototype = Object.create(Jump.prototype);
-JumpIf.prototype.constructor = JumpIf;
-JumpIf.prototype.execute = function(process) {
-    if (process.controlBlock.registers[this.register]) {
-        process.controlBlock.pc += this.n;
+JumpIfEqual.prototype.execute = function(process) {
+    if (process.registers.zf) {
+        process.registers.eip = process.program.labels[this.label];
     }
-    ++process.controlBlock.pc;
+};
+
+function JumpIfNotEqual(label) {
+    this.label = label;
 }
 
+JumpIfNotEqual.prototype.execute = function(process) {
+    if (!process.registers.zf) {
+        process.registers.eip = process.program.labels[this.label];
+    }
+};
+
+function Call(closure) {
+    this.closure = closure;
+}
+
+Call.prototype.execute = function(process) {
+    this.closure(process.pid);
+};
+
+function Computer() {
+    this.pidCounter = 2;
+    this.cpus = {};
+    this.queue = [];
+
+    var self = this;
+    var initProgram = new Program([
+        new Move("ebx", -1),
+        new Call(function(pid) {self.waitpid(pid)}),
+        new Jump("begin")
+    ], {"begin": 1});
+    var initProcess = new Process(1, 0, initProgram);
+    this.processes = {1: initProcess};
+
+    // TODO: REMOVE
+    var processDomElement = new ProcessDomElement(initProcess);
+    domElements.push(processDomElement);
+}
+
+Computer.prototype.reap = function(pid) {
+    var process = this.processes[pid];
+    for (var pid in this.processes) {
+        if (this.processes[pid].ppid === process.pid) {
+            this.processes[pid].ppid = 1;
+        }
+    }
+    delete this.processes[pid];
+};
+
+Computer.prototype.doWait = function(pid) {
+    var process = this.processes[pid];
+    for (var cpu in this.cpus) {
+        if (this.cpus[cpu] && this.cpus[cpu].pid === pid) {
+            this.cpus[pid] = null;
+            break;
+        }
+    }
+    process.state = State.WAITING;
+};
+
+Computer.prototype.fork = function(pid) {
+    var originalProcess = this.processes[pid];
+    var forkedProcess = new Process(this.pidCounter++, pid, originalProcess.program);
+    originalProcess.registers.eax = forkedProcess.pid;
+    forkedProcess.registers = JSON.parse(JSON.stringify(originalProcess.registers));
+    forkedProcess.registers.eax = 0;
+    this.processes[forkedProcess.pid] = forkedProcess;
+};
+
+Computer.prototype.waitpid = function(pid) {
+    var process = this.processes[pid];
+    var arg = process.registers.ebx;
+    var children;
+    var self = this;
+    if (arg === -1) {
+        children = Object.keys(this.processes).filter(function(pid) {
+            return self.processes[pid].ppid === process.pid;
+        });
+    } else if (this.processes.hasOwnProperty(arg) && this.processes[arg].ppid === process.pid) {
+        children = [arg];
+    } else {
+        children = [];
+    }
+    if (children.length === 0) {
+        process.registers.eax = -1;
+    } else {
+        for (var i in children) {
+            var child = this.processes[children[i]];
+            if (child.state === State.TERMINATED) {
+                process.registers.eax = child.pid;
+                this.reap(child.pid);
+                return;
+            }
+        }
+        var onTerminated = function(pid) {
+            children.forEach(function(child) {
+                delete child.onTerminated;
+            });
+            process.registers.eax = pid;
+            self.reap(pid);
+            self.processes[process.pid].state = State.READY;
+        };
+        children.forEach(function(pid) {
+            self.processes[pid].onTerminated = function() {
+                onTerminated(pid);
+            }
+        });
+        this.doWait(pid);
+    }
+};
+
+Computer.prototype.doCycle = function() {
+    var process;
+    for (var pid in this.processes) {
+        process = this.processes[pid];
+        if (!process.inQueue && !process.inCpu && [State.READY, State.NEW].indexOf(process.state) !== -1) {
+            this.queue.push(process);
+            process.inQueue = true;
+        }
+    }
+
+    for (var cpu in this.cpus) {
+        process = this.cpus[cpu];
+        if (process) {
+            if (process.state === State.NEW) {
+                process.state = State.RUNNING;
+            } else {
+                process.program.instructions[process.registers.eip++].execute(process);
+                if (process.registers.eip === process.program.instructions.length) {
+                    process.state = State.TERMINATED;
+                    this.cpus[cpu] = null;
+                }
+            }
+        }
+        if (!this.cpus[cpu] && this.queue.length > 0) {
+            process = this.queue.splice(0, 1)[0];
+            process.inQueue = false;
+            this.cpus[cpu] = process;
+            process.inCpu = true;
+            if (process.state === State.READY) {
+                process.state = State.RUNNING;
+            }
+        }
+    }
+
+    domElements.forEach(function(domElement) {domElement.update()});
+};
+
+// TODO: WIP
 var domElements = [];
 
 function ProcessDomElement(process) {
@@ -214,30 +230,56 @@ function ProcessDomElement(process) {
     this.state = document.createElement("p");
     this.state.className = "mb-0";
 
-    this.pc = document.createElement("p");
-    this.pc.className = "mb-0";
+    this.eax = document.createElement("p");
+    this.eax.className = "mb-0";
+
+    this.ebx = document.createElement("p");
+    this.ebx.className = "mb-0";
+
+    this.eip = document.createElement("p");
+    this.eip.className = "mb-0";
 
     this.root.appendChild(cardBody);
     cardBody.appendChild(this.pid);
     cardBody.appendChild(this.state);
-    cardBody.appendChild(this.pc);
+    cardBody.appendChild(this.eax);
+    cardBody.appendChild(this.ebx);
+    cardBody.appendChild(this.eip);
 }
 
 ProcessDomElement.prototype.update = function() {
-    this.pid.textContent = "PID " + this.process.controlBlock.pid;
-    this.state.textContent = "State: " + this.process.controlBlock.state;
-    this.pc.textContent = "PC: " + this.process.controlBlock.pc;
+    this.pid.textContent = "PID " + this.process.pid + " PPID " + this.process.ppid;
+    this.state.textContent = "State: " + this.process.state;
+    this.eax.textContent = "eax: " + this.process.registers.eax;
+    this.ebx.textContent = "ebx: " + this.process.registers.ebx;
+    this.eip.textContent = "eip: " + this.process.registers.eip;
+    document.getElementById("processes").appendChild(this.root);
+};
+
+var computer = new Computer();
+
+function doCycle() {
+    computer.doCycle();
+    setTimeout(function() {
+        doCycle();
+    }, 1000);
 }
 
 window.onload = function() {
-    Computer.cpus[0] = null;
+    computer.cpus[0] = null;
+    /*
     var program = [new Sleep(10)];
     var controlBlock = new ControlBlock(counter++, 0, State.NEW, {});
     var process = new Process(controlBlock, program);
     Computer.createProcess(process);
+    */
     
-    var domElement = new ProcessDomElement(process);
-    domElements.push(domElement);
-    document.getElementById("processes").appendChild(domElement.root);
-    domElement.update();
-}
+    //var domElement = new ProcessDomElement(process);
+    //domElements.push(domElement);
+    //document.getElementById("processes").appendChild(domElement.root);
+    //domElement.update();
+    document.getElementById("processes").innerHTML = "";
+    domElements.forEach(function(domElement) {domElement.update()});
+
+    doCycle();
+};
