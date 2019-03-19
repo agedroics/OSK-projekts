@@ -142,7 +142,7 @@ Call.prototype.toString = function() {
 
 function Computer() {
     this.pidCounter = 2;
-    this.cpus = {};
+    this.cpus = {0: null};
     this.queue = [];
 
     this.programs = {
@@ -429,8 +429,9 @@ new Vue({
             return (process.registers[Register.FLAGS] & Flag.ZF) === 0 ? "NZ" : "ZR";
         },
         getInstruction: function(process) {
-            return process.registers[Register.EIP] >= process.program.length ? "-" :
-                process.program[process.registers[Register.EIP]].toString();
+            return process.registers[Register.EIP] >= process.program.length || process.registers[Register.EIP] < 0
+                ? "-"
+                : process.program[process.registers[Register.EIP]].toString();
         },
         createProcess: function() {
             var process = new Process(this.computer.pidCounter++, 1, this.computer.programs[this.selected]);
