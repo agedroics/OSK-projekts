@@ -79,9 +79,9 @@
             <div class="row p-2">
                 <div class="p-2 col-sm-6 col-md-4 col-lg-3" v-for="(process, pid) in computer.processes">
                     <div class="card">
-                        <div class="card-header" :class="{'text-white': process.inQueue || process.inCpu,
-                                                          'bg-warning': process.inQueue,
-                                                          'bg-success': process.inCpu}">
+                        <div class="card-header" :class="{'text-white': process.state === State.READY || process.state === State.RUNNING,
+                                                          'bg-warning': process.state === State.READY,
+                                                          'bg-success': process.state === State.RUNNING}">
                             <div class="d-flex">
                                 <p class="mb-0 mr-auto"><strong>PID {{ pid }}</strong></p>
                                 <p class="mb-0">PPID {{ process.ppid }}</p>
@@ -98,11 +98,11 @@
                             </table>
                             <div class="d-flex">
                                 <button type="button" class="btn btn-outline-danger mr-auto"
-                                        @click="computer.kill(0, process.pid)">
+                                        @click="killProcess(process.pid)">
                                     <span class="oi oi-x icon"></span>Kill
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary"
-                                        :disabled="!process.inCpu" @click="computer.yield(process.pid)">
+                                        :disabled="!process.hasOwnProperty('cpu')" @click="yieldProcess(process.pid)">
                                     <span class="oi oi-eject icon"></span>Yield
                                 </button>
                             </div>
