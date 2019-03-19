@@ -268,8 +268,10 @@ Computer.prototype.wait = function(pid) {
 
 Computer.prototype.yield = function(pid) {
     if (this.queue.length !== 0) {
+        var process = this.processes[pid];
         this.toReady(pid);
-        ++this.processes[pid].registers[Register.EIP];
+        process.registers[Register.EAX] = 0;
+        ++process.registers[Register.EIP];
     }
 };
 
@@ -349,7 +351,7 @@ Computer.prototype.compile = function(code) {
             } else {
                 labels[label] = program.length;
             }
-        } else if ((found = lines[i].match(/^\s*(cmp|sub|mov)\s+([a-z]+),\s*([a-z]+|-?\d+)\s*$/i))) {
+        } else if ((found = lines[i].match(/^\s*(cmp|sub|mov)\s+([a-z]+),\s*([a-z]+|-?(?:0x)?\d+)\s*$/i))) {
             switch (found[1].toLowerCase()) {
                 case "cmp":
                     constructor = Compare;
@@ -431,7 +433,7 @@ new Vue({
     },
     methods: {
         getFlags: function(process) {
-            return (process.registers[Register.FLAGS] & Flag.ZF) === 0 ? "NZ" : "ZR";
+            return (process.registers[Register.FLAGS] & Flag.ZF) === 0 ? "-" : "ZF";
         },
         getInstruction: function(process) {
             return process.registers[Register.EIP] >= process.program.length || process.registers[Register.EIP] < 0
@@ -499,18 +501,18 @@ new Vue({
             }
             if (speed) {
                 this.delay = 2000 / speed;
-                var self = this;
-                this.timerId = setTimeout(function() {
-                    self.doCycle();
-                }, this.delay);
+                this.scheduleCycle();
             }
         },
-        doCycle: function() {
-            this.computer.doCycle();
+        scheduleCycle: function() {
             var self = this;
             this.timerId = setTimeout(function() {
                 self.doCycle();
             }, this.delay);
+        },
+        doCycle: function() {
+            this.computer.doCycle();
+            this.scheduleCycle();
         }
     }
 });

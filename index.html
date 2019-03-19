@@ -17,6 +17,13 @@
             margin-right: .5rem;
             text-align: center
         }
+        .btn-control {
+            min-width: 28px;
+        }
+        .btn-control:focus,.btn-control:active {
+            outline: none;
+            box-shadow: none;
+        }
     </style>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.slim.min.js"></script>
     <script type="text/javascript" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
@@ -113,19 +120,16 @@
         </div>
 
         <nav class="navbar navbar-light bg-light fixed-bottom">
-            <div class="container justify-content-start px-0 px-sm-3">
+            <div class="container flex-nowrap px-0 px-sm-3">
                 <p class="mb-0">CPUs:</p>
-                <button type="button" class="btn btn-sm" style="width: 32px" @click="removeCpu()"
+                <button type="button" class="btn btn-sm btn-light mx-1 btn-control" @click="removeCpu()"
                         v-if="Object.keys(computer.cpus).length !== 0">-</button>
                 <span class="oi oi-hard-drive mx-1" v-for="(process, cpu) in computer.cpus"
-                      :class="{'text-secondary': !process, 'text-success': process}"></span>
-                <button type="button" class="btn btn-sm mr-auto" style="width: 32px" @click="addCpu()">+</button>
-
-                <div class="d-flex">
-                    <label for="speed" class="mb-0 mr-2">Speed:</label>
-                    <input id="speed" type="range" class="custom-range" min="0" step="1" max="8" value="0"
-                           @change="changeSpeed">
-                </div>
+                      :class="{'text-secondary': !process, 'text-primary': process}"></span>
+                <button type="button" class="btn btn-sm btn-light mx-1 btn-control" @click="addCpu()">+</button>
+                <label for="speed" class="mb-0 ml-auto mr-2">Speed:</label>
+                <input id="speed" type="range" class="custom-range" min="0" step="1" max="8" value="0"
+                       style="width: 100px" @change="changeSpeed">
             </div>
         </nav>
 
@@ -146,8 +150,55 @@
                             <div class="invalid-feedback" v-if="errors.name">{{ errors.name }}</div>
                         </div>
                         <div class="form-group">
-                            <label for="code">Code</label>
-                            <textarea id="code" class="form-control" rows="8" v-model="code"
+                            <label for="code">Code <a data-toggle="collapse" href="#help" title="Help" role="button">?</a></label>
+                            <div id="help" class="collapse">
+                                <div class="card card-body mb-3">
+                                    <h5>Instructions</h5>
+                                    <code>mov <var>target_register</var>, <var>source_register/number</var></code>
+                                    <p>Copies value into register.</p>
+                                    <code>sub <var>target_register</var>, <var>source_register/number</var></code>
+                                    <p>Subtracts value from register and sets flags.</p>
+                                    <code>cmp <var>target_register</var>, <var>source_register/number</var></code>
+                                    <p>Subtracts value from register without storing the result and sets flags.</p>
+                                    <code>jmp <var>label</var></code>
+                                    <p>Jumps to label.</p>
+                                    <code>je <var>label</var></code>
+                                    <p>Jumps to label if ZF is set.</p>
+                                    <code>jne <var>label</var></code>
+                                    <p>Jumps to label if ZF is not set.</p>
+                                    <code>call <var>callable</var></code>
+                                    <hr>
+                                    <h5>Flags</h5>
+                                    <p class="mb-0">Zero flag (ZF): <code>0x0040</code></p>
+                                    <p class="mb-0">Set when the result of an operation is 0.</p>
+                                    <hr>
+                                    <h5>Labels</h5>
+                                    <p class="mb-0">A label is an <var>identifier</var> followed by a colon.<br>
+                                        An <var>identifier</var> consists of alphanumerics and underscores.<br>
+                                        Example: <code>begin:</code></p>
+                                    <hr>
+                                    <h5>Callables</h5>
+                                    <p>Pass arguments to callables through <var>ebx</var>.<br>
+                                        Return values are stored in <var>eax</var>.</p>
+                                    <code>fork</code>
+                                    <p>Creates a copy of the calling process.<br>
+                                        Takes no arguments.<br>
+                                        Returns child pid for the parent process or 0 for the child.</p>
+                                    <code>wait</code>
+                                    <p>Blocks until a child process is terminated and reaps it.<br>
+                                        Takes pid as argument or -1 to wait for any child.<br>
+                                        Returns 0 on success or -1 on error.</p>
+                                    <code>yield</code>
+                                    <p>Suspends the calling process if there are any waiting processes.<br>
+                                        Takes no arguments.<br>
+                                        Returns 0 on success.</p>
+                                    <code>kill</code>
+                                    <p class="mb-0">Attempts to terminate a process.<br>
+                                        Takes pid as argument.<br>
+                                        Returns 0 on success or -1 on error.</p>
+                                </div>
+                            </div>
+                            <textarea id="code" class="form-control text-monospace" rows="8" v-model="code"
                                       :class="{'is-invalid': errors.code}"></textarea>
                             <div class="invalid-feedback" v-if="errors.code">{{ errors.code }}</div>
                         </div>
