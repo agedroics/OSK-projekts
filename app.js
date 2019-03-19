@@ -209,6 +209,11 @@ Computer.prototype.toTerminated = function(pid) {
         throw new Error("Invalid state transition: " + process.state + " => " + State.TERMINATED);
     }
     process.state = State.TERMINATED;
+    for (var childPid in this.processes) {
+        if (this.processes[childPid].ppid === pid) {
+            this.processes[childPid].ppid = 1;
+        }
+    }
     this.cpus[process.cpu] = null;
     Vue.delete(process, "cpu");
     var parent = this.processes[process.ppid];
@@ -228,19 +233,6 @@ Computer.prototype.fork = function(pid) {
     forkedProcess.registers = JSON.parse(JSON.stringify(process.registers));
     forkedProcess.registers[Register.EAX] = 0;
     this.toNew(forkedProcess);
-};
-
-Computer.prototype.reap = function(pid) {
-    var process = this.processes[pid];
-    if (process.state !== State.TERMINATED) {
-        throw new Error("Cannot reap process in state " + process.state);
-    }
-    for (var childPid in this.processes) {
-        if (this.processes[childPid].ppid === pid) {
-            this.processes[childPid].ppid = 1;
-        }
-    }
-    Vue.delete(this.processes, pid);
 };
 
 Computer.prototype.wait = function(pid) {
@@ -264,8 +256,8 @@ Computer.prototype.wait = function(pid) {
         for (var i in children) {
             var child = this.processes[children[i]];
             if (child.state === State.TERMINATED) {
-                this.reap(child.pid);
                 process.registers[Register.EAX] = child.pid;
+                Vue.delete(this.processes, child.pid);
                 ++process.registers[Register.EIP];
                 return;
             }
