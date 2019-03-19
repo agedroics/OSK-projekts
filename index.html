@@ -1,20 +1,121 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-  <title></title>
-  <script type="text/javascript" src="script.js"></script>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css">
+    <style>
+        [v-cloak] {
+            display: none !important;
+        }
+        .in-cpu {
+            background-color: green;
+        }
+    </style>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.slim.min.js"></script>
+    <script type="text/javascript" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <title>Process state demo</title>
 </head>
 <body>
-<div class="container">
-  <div class="row">
-    <div id="processes" class="col-9 d-flex flex-wrap p-2">
+    <div id="app" class="container" v-cloak>
+        <div class="px-3 pt-3">
+            <div class="form-group">
+                <label for="program">Program</label>
+                <div class="input-group">
+                    <select id="program" class="form-control" v-model="selected"
+                            :disabled="Object.keys(computer.programs).length === 0">
+                        <option v-for="(program, name) in computer.programs">
+                            {{ name }}
+                        </option>
+                    </select>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-outline-success" :disabled="!selected"
+                                @click="createProcess()">
+                            <span class="oi oi-media-play"></span>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" @click="openNew()"
+                                data-toggle="modal" data-target="#editor-modal">
+                            <span class="oi oi-plus"></span>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" :disabled="!selected"
+                                @click="openEdit()"
+                                data-toggle="modal" data-target="#editor-modal">
+                            <span class="oi oi-pencil"></span>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" :disabled="!selected"
+                                @click="deleteProgram()">
+                            <span class="oi oi-trash"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-start flex-wrap p-2">
+            <div class="card m-2" v-for="(process, pid) in computer.processes">
+                <div class="container" :class="{'text-white': process.inQueue || process.inCpu,
+                                                'bg-warning': process.inQueue,
+                                                'bg-success': process.inCpu}">
+                    <div class="row card-header">
+                        <p class="mb-0 mr-auto"><strong>PID {{ pid }}</strong></p>
+                        <p class="mb-0">PPID {{ process.ppid }}</p>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h3 class="text-center">{{ process.state }}</h3>
+                    <p class="text-center"><code>{{ getInstruction(process) }}</code></p>
+                    <table class="table mb-0">
+                        <thead>
+                        <tr>
+                            <th>Register</th>
+                            <th class="text-right">Value</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr v-for="(value, register) in process.registers">
+                            <td>{{ register }}</td>
+                            <td class="text-right">{{ register === Register.FLAGS ? getFlags(process) : value }}</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="editor-modal" class="modal" tabindex="-1" role="dialog" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Program editor</h5>
+                        <button type="button" class="close" data-dismiss="modal">
+                            <span>&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="name">Name</label>
+                            <input type="text" id="name" class="form-control" v-model="name"
+                                   :class="{'is-invalid': errors.name}">
+                            <div class="invalid-feedback" v-if="errors.name">{{ errors.name }}</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="code">Code</label>
+                            <textarea id="code" class="form-control" rows="8" v-model="code"
+                                      :class="{'is-invalid': errors.code}"></textarea>
+                            <div class="invalid-feedback" v-if="errors.code">{{ errors.code }}</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" @click="save()">Compile and save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="col-3 p-3">
-      asd
-    </div>
-  </div>
-</div>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.9/vue.min.js"></script>
+    <script type="text/javascript" src="app.js"></script>
 </body>
 </html>
