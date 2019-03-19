@@ -231,6 +231,56 @@ Computer.prototype.wait = function(pid) {
     }
 };
 
+Computer.prototype.yield = function(pid) {
+    if (this.queue.length !== 0) {
+        var process = this.processes[pid];
+        for (var cpu in this.cpus) {
+            if (this.cpus[cpu] && this.cpus[cpu].pid === pid) {
+                this.cpus[cpu] = null;
+                Vue.set(process, "inCpu", false);
+                this.queue.push(process);
+                Vue.set(process, "inQueue", true);
+                break;
+            }
+        }
+    }
+};
+
+Computer.prototype.kill = function(pid, targetPid) {
+    var process;
+    if (pid) {
+        process = this.processes[pid];
+    } else {
+        process = new Process(0, 0, []);
+    }
+    if (typeof targetPid === "undefined") {
+        targetPid = process.registers[Register.EBX];
+    }
+    if (!this.processes.hasOwnProperty(targetPid)) {
+        process.registers[Register.EAX] = -1;
+    } else {
+        var target = this.processes[targetPid];
+        target.state = State.TERMINATED;
+        if (target.inQueue) {
+            this.queue.splice(this.queue.indexOf(target), 1);
+            Vue.set(target, "inQueue", false);
+        }
+        if (target.inCpu) {
+            for (var cpu in this.cpus) {
+                if (this.cpus[cpu] && this.cpus[cpu].pid === target.pid) {
+                    this.cpus[cpu] = null;
+                    Vue.set(target, "inCpu", false);
+                    break;
+                }
+            }
+        }
+        if (target.onTerminated) {
+            target.onTerminated();
+        }
+        process.registers[Register.EAX] = 0;
+    }
+};
+
 Computer.prototype.doCycle = function() {
     var process;
     for (var pid in this.processes) {
@@ -245,12 +295,9 @@ Computer.prototype.doCycle = function() {
         process = this.cpus[cpu];
         if (process) {
             if (process.state === State.NEW) {
-                if (process.registers[Register.EIP] >= process.program.length) {
-                    process.state = State.TERMINATED;
-                } else {
-                    process.state = State.RUNNING;
-                }
-            } else if (process.state === State.TERMINATED) {
+                process.state = State.RUNNING;
+            } else if (process.registers[Register.EIP] >= process.program.length || process.registers[Register.EIP] < 0) {
+                process.state = State.TERMINATED;
                 this.cpus[cpu] = null;
                 Vue.set(process, "inCpu", false);
                 if (process.onTerminated) {
@@ -258,9 +305,6 @@ Computer.prototype.doCycle = function() {
                 }
             } else {
                 process.program[process.registers[Register.EIP]++].execute(process);
-                if (process.registers[Register.EIP] >= process.program.length) {
-                    process.state = State.TERMINATED;
-                }
             }
         }
         if (!this.cpus[cpu] && this.queue.length > 0) {
@@ -328,7 +372,7 @@ Computer.prototype.compile = function(code) {
                     constructor = JumpIfNotEqual;
             }
             program.push(new constructor(null, found[2]));
-        } else if ((found = lines[i].match(/^\s*[cC][aA][lL][lL]\s+(fork|wait)\s*$/))) {
+        } else if ((found = lines[i].match(/^\s*[cC][aA][lL][lL]\s+(fork|wait|yield|kill)\s*$/))) {
             program.push(new Call(
                 (function(self, identifier) {
                     return function(pid) {self[identifier](pid);}
@@ -369,27 +413,16 @@ function decompile(program) {
     return code.join("\n");
 }
 
-var computer = new Computer();
-computer.cpus[0] = null;
-computer.cpus[1] = null;
-
-function doCycle() {
-    computer.doCycle();
-    setTimeout(function() {
-        doCycle();
-    }, 1000);
-}
-
-doCycle();
-
-var app = new Vue({
+new Vue({
     el: "#app",
     data: {
-        computer: computer,
+        computer: new Computer(),
         selected: "init",
         name: "",
         code: "",
-        errors: {}
+        errors: {},
+        delay: 1000,
+        timerId: null
     },
     methods: {
         getFlags: function(process) {
@@ -410,11 +443,11 @@ var app = new Vue({
         },
         openEdit: function() {
             this.name = this.selected;
-            this.code = decompile(computer.programs[this.selected]);
+            this.code = decompile(this.computer.programs[this.selected]);
             this.errors = {};
         },
         deleteProgram: function() {
-            Vue.delete(computer.programs, this.selected);
+            Vue.delete(this.computer.programs, this.selected);
             this.selected = Object.keys(this.computer.programs).length === 0 ? null : Object.keys(this.computer.programs)[0];
         },
         save: function() {
@@ -424,12 +457,46 @@ var app = new Vue({
             }
             var result = this.computer.compile(this.code);
             if (!Array.isArray(result)) {
-                Vue.set(this.errors, "code", "Error at line " + (parseInt(result) + 1));
+                Vue.set(this.errors, "code", "Error on line " + (parseInt(result) + 1));
             } else if (!this.errors.name) {
                 Vue.set(this.computer.programs, this.name.trim(), result);
                 this.selected = this.name;
                 $("#editor-modal").modal("hide");
             }
+        },
+        addCpu: function() {
+            Vue.set(this.computer.cpus, Object.keys(this.computer.cpus).length, null);
+        },
+        removeCpu: function() {
+            var cpu = Object.keys(this.computer.cpus).length - 1;
+            var process = this.computer.cpus[cpu];
+            Vue.delete(this.computer.cpus, cpu);
+            if (process) {
+                Vue.set(process, "inCpu", false);
+                this.computer.queue.push(process);
+                Vue.set(process, "inQueue", true);
+            }
+        },
+        changeSpeed: function(event) {
+            var speed = parseInt(event.target.value);
+            if (this.timerId !== null) {
+                clearTimeout(this.timerId);
+                this.timerId = null;
+            }
+            if (speed) {
+                this.delay = 2000 / speed;
+                var self = this;
+                this.timerId = setTimeout(function() {
+                    self.doCycle();
+                }, this.delay);
+            }
+        },
+        doCycle: function() {
+            this.computer.doCycle();
+            var self = this;
+            this.timerId = setTimeout(function() {
+                self.doCycle();
+            }, this.delay);
         }
     }
 });
