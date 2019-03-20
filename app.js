@@ -202,7 +202,7 @@ Computer.prototype.toNew = function(process) {
 
 Computer.prototype.toReady = function(pid) {
     var process = this.processes[pid];
-    if ([State.NEW, State.READY, State.WAITING, State.RUNNING].indexOf(process.state) === -1) {
+    if ([State.NEW, State.WAITING, State.RUNNING].indexOf(process.state) === -1) {
         throw new Error("Invalid state transition: " + process.state + " => " + State.READY);
     }
     process.state = State.READY;
@@ -317,11 +317,11 @@ Computer.prototype.wait = function(pid, stateChanges) {
 
 Computer.prototype.yield = function(pid) {
     if (this.queue.length !== 0) {
-        var process = this.processes[pid];
         this.toReady(pid);
-        process.registers[Register.EAX] = 0;
-        ++process.registers[Register.EIP];
     }
+    var process = this.processes[pid];
+    process.registers[Register.EAX] = 0;
+    ++process.registers[Register.EIP];
 };
 
 Computer.prototype.kill = function(pid, stateChanges) {
