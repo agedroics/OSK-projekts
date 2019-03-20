@@ -241,10 +241,14 @@ Computer.prototype.processIsWaitingFor = function(parentPid, childPid) {
         return false;
     }
     var parent = this.processes[parentPid];
-    var instruction = parent.program[parent.registers[Register.EIP]];
-    var arg = parent.registers[Register.EBX];
-    return parent.state === State.WAITING && instruction.constructor === Call &&
-        instruction.identifier === "wait" && (arg === -1 || arg === childPid);
+    if (parent) {
+        var instruction = parent.program[parent.registers[Register.EIP]];
+        var arg = parent.registers[Register.EBX];
+        return parent.state === State.WAITING && instruction.constructor === Call &&
+            instruction.identifier === "wait" && (arg === -1 || arg === childPid);
+    } else {
+        return false;
+    }
 };
 
 Computer.prototype.toTerminated = function(pid) {
@@ -379,20 +383,18 @@ Computer.prototype.doCycle = function() {
 
     for (cpu in this.cpus) {
         process = this.cpus[cpu];
+        var roundRobin = this.roundRobin[cpu];
         if (process) {
-            var roundRobin = this.roundRobin[cpu];
-            if (roundRobin.pid === process.pid) {
-                ++roundRobin.time;
-            } else {
-                roundRobin.pid = process.pid;
-                roundRobin.time = 1;
-            }
+            ++roundRobin.time;
             if (this.quantum && roundRobin.time >= this.quantum && this.queue.length !== 0) {
                 this.toReady(process.pid);
-                this.toRunning(this.queue[0].pid, cpu);
             }
-        } else if (this.queue.length !== 0) {
-            this.toRunning(this.queue[0].pid, cpu);
+        }
+        if (!this.cpus[cpu] && this.queue.length !== 0) {
+            pid = this.queue[0].pid;
+            this.toRunning(pid, cpu);
+            roundRobin.pid = pid;
+            roundRobin.time = 0;
         }
     }
 };
@@ -488,6 +490,15 @@ function decompile(program) {
     return code.join("\n");
 }
 
+Computer.prototype.getFreeCpu = function() {
+    for (var cpu in this.cpus) {
+        if (!this.cpus[cpu]) {
+            return cpu;
+        }
+    }
+    return null;
+};
+
 new Vue({
     el: "#app",
     data: {
@@ -541,14 +552,14 @@ new Vue({
         },
         save: function() {
             this.errors = {};
-            if (!this.name || !this.name.trim()) {
+            if (!this.name) {
                 Vue.set(this.errors, "name", "Please provide a name");
             }
             var result = this.computer.compile(this.code);
             if (!Array.isArray(result)) {
                 Vue.set(this.errors, "code", "Error on line " + (parseInt(result) + 1));
             } else if (!this.errors.name) {
-                Vue.set(this.computer.programs, this.name.trim(), result);
+                Vue.set(this.computer.programs, this.name, result);
                 this.selected = this.name;
                 $("#editor-modal").modal("hide");
             }
@@ -572,6 +583,20 @@ new Vue({
         doCycle: function() {
             this.computer.doCycle();
             this.scheduleCycle();
+        },
+        readyDisabled: function(process) {
+            return [State.NEW, State.WAITING, State.RUNNING].indexOf(process.state) === -1;
+        },
+        runningDisabled: function(process) {
+            return process.state !== State.READY || Object.keys(this.computer.cpus).length === 0;
+        },
+        toRunning: function(process) {
+            var cpu = this.computer.getFreeCpu();
+            if (cpu === null) {
+                cpu = 0;
+                this.computer.toReady(this.computer.cpus[cpu].pid);
+            }
+            this.computer.toRunning(process.pid, cpu);
         }
     },
     created: function() {
