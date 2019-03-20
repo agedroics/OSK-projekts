@@ -15,6 +15,8 @@ var Flag = Object.freeze({
 var Register = Object.freeze({
     EAX: "eax",
     EBX: "ebx",
+    ECX: "ecx",
+    EDX: "edx",
     EIP: "eip",
     FLAGS: "flags"
 });
@@ -150,7 +152,7 @@ function Computer() {
     this.quantum = 5;
     this.cpus = {};
     this.programs = {
-        "init": this.compile("mov ebx, -1\nbegin:\ncall wait\njmp begin")
+        "init": this.compile("mov ecx, -1\nbegin:\ncall wait\njmp begin")
     };
     this.restart();
 }
@@ -243,7 +245,7 @@ Computer.prototype.processIsWaitingFor = function(parentPid, childPid) {
     var parent = this.processes[parentPid];
     if (parent) {
         var instruction = parent.program[parent.registers[Register.EIP]];
-        var arg = parent.registers[Register.EBX];
+        var arg = parent.registers[Register.ECX];
         return parent.state === State.WAITING && instruction.constructor === Call &&
             instruction.identifier === "wait" && (arg === -1 || arg === childPid);
     } else {
@@ -286,7 +288,7 @@ Computer.prototype.fork = function(pid) {
 Computer.prototype.wait = function(pid, stateChanges) {
     var self = this;
     var process = this.processes[pid];
-    var arg = process.registers[Register.EBX];
+    var arg = process.registers[Register.ECX];
     if (arg === -1) {
         var children = Object.keys(this.processes).filter(function(childPid) {
             return self.processes[childPid].ppid === pid;
@@ -324,7 +326,7 @@ Computer.prototype.yield = function(pid) {
 
 Computer.prototype.kill = function(pid, stateChanges) {
     var process = this.processes[pid];
-    var arg = process.registers[Register.EBX];
+    var arg = process.registers[Register.ECX];
     if (!this.processes[arg] || arg === 1) {
         process.registers[Register.EAX] = -1;
     } else {
@@ -508,18 +510,19 @@ new Vue({
         code: "",
         errors: {},
         speed: 0,
-        delay: 1000,
-        timerId: null
+        intervalId: null
     },
     watch: {
         speed: function(val) {
-            if (this.timerId !== null) {
-                clearTimeout(this.timerId);
-                this.timerId = null;
+            if (this.intervalId !== null) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
             }
             if (val) {
-                this.delay = 2000 / val;
-                this.scheduleCycle();
+                var self = this;
+                this.intervalId = setInterval(function() {
+                    self.computer.doCycle();
+                }, 2000 / val);
             }
         }
     },
@@ -563,26 +566,6 @@ new Vue({
                 this.selected = this.name;
                 $("#editor-modal").modal("hide");
             }
-        },
-        killProcess: function(pid) {
-            var killProgram = this.computer.compile("mov ebx, " + pid + "\ncall kill");
-            var killer = new Process(this.computer.pidCounter++, 1, killProgram);
-            this.computer.toNew(killer);
-        },
-        yieldProcess: function(pid) {
-            if (this.computer.queue.length !== 0) {
-                this.computer.toReady(pid);
-            }
-        },
-        scheduleCycle: function() {
-            var self = this;
-            this.timerId = setTimeout(function() {
-                self.doCycle();
-            }, this.delay);
-        },
-        doCycle: function() {
-            this.computer.doCycle();
-            this.scheduleCycle();
         },
         readyDisabled: function(process) {
             return [State.NEW, State.WAITING, State.RUNNING].indexOf(process.state) === -1;
