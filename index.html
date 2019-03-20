@@ -18,11 +18,7 @@
             text-align: center
         }
         .btn-control {
-            min-width: 28px;
-        }
-        .btn-control:focus,.btn-control:active {
-            outline: none;
-            box-shadow: none;
+            min-width: 32px;
         }
     </style>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.slim.min.js"></script>
@@ -31,10 +27,10 @@
 </head>
 <body>
     <div id="app" v-cloak>
-        <nav class="navbar navbar-light bg-light py-3 fixed-top">
-            <div class="form-group container mb-0 px-0 px-sm-3">
+        <div class="bg-light py-3 fixed-top">
+            <div class="form-group container mb-0">
                 <div class="input-group">
-                    <select class="form-control" v-model="selected"
+                    <select class="custom-select" v-model="selected"
                             :disabled="Object.keys(computer.programs).length === 0">
                         <option v-for="(program, name) in computer.programs" :value="name">
                             {{ name }}
@@ -80,9 +76,9 @@
                     </div>
                 </div>
             </div>
-        </nav>
+        </div>
 
-        <div class="container" style="margin-top: 70px; margin-bottom: 92px">
+        <div class="container" style="margin-top: 70px; margin-bottom: 130px">
             <div class="row p-2">
                 <div class="p-2 col-sm-6 col-md-4 col-lg-3" v-for="(process, pid) in computer.processes">
                     <div class="card">
@@ -137,31 +133,52 @@
             </div>
         </div>
 
-        <nav class="navbar navbar-light bg-light fixed-bottom">
-            <div class="container px-0 px-sm-3">
-                <div class="d-flex flex-nowrap align-items-center mr-auto">
-                    <button type="button" class="btn btn-sm btn-outline-danger mr-3" title="Restart"
-                            @click="computer.restart()">
-                        <span class="oi oi-reload"></span>
-                    </button>
-                    <label class="col-form-label">CPUs:</label>
-                    <button type="button" class="btn btn-sm btn-light mx-1 btn-control" @click="computer.removeCpu()"
-                            v-if="Object.keys(computer.cpus).length !== 0">-</button>
-                    <span class="oi oi-hard-drive mx-1" v-for="(process, cpu) in computer.cpus"
-                          :class="{'text-secondary': !process, 'text-primary': process}"></span>
-                    <button type="button" class="btn btn-sm btn-light ml-1 mr-3 btn-control" @click="computer.addCpu()">+</button>
-                </div>
-                <div class="d-flex flex-nowrap align-items-center">
-                    <label for="speed" class="mb-0 mr-2 col-form-label">Speed:</label>
-                    <input id="speed" type="range" class="custom-range mr-3" min="0" step="1" max="10"
-                           v-model.number="speed" style="width: 100px">
+        <div class="bg-light py-2 fixed-bottom">
+            <div class="container">
+                <div class="row">
+                    <div class="d-flex align-items-center col-4 col-sm-3">
+                        <label class="col-form-label">CPUs:</label>
+                    </div>
+                    <div class="d-flex flex-nowrap align-items-center col-8 col-sm-9">
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-control"
+                                @click="computer.removeCpu()"
+                                :disabled="Object.keys(computer.cpus).length === 0">-</button>
+                        <label class="mb-0 mx-3">{{ Object.keys(computer.cpus).length }}</label>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-right btn-control"
+                                @click="computer.addCpu()">+</button>
 
-                    <label for="quantum" class="mb-0 mr-2 col-form-label">Quantum:</label>
-                    <input id="quantum" type="range" class="custom-range" min="0" step="1" max="10"
-                           v-model.number="computer.quantum" style="width: 100px">
+                        <div class="btn-group ml-auto">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Step"
+                                    @click="computer.doCycle()">
+                                <span class="oi oi-media-step-forward"></span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Restart"
+                                    @click="computer.restart()">
+                                <span class="oi oi-reload"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="d-flex align-items-center col-4 col-sm-3">
+                        <label class="col-form-label" for="speed">Speed:</label>
+                    </div>
+                    <div class="d-flex align-items-center col-8 col-sm-9">
+                        <input id="speed" type="range" class="custom-range" min="0" max="10"
+                               v-model.number="speed">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="d-flex align-items-center col-4 col-sm-3">
+                        <label class="col-form-label" for="quantum">Quantum:</label>
+                    </div>
+                    <div class="d-flex align-items-center col-8 col-sm-9">
+                        <input id="quantum" type="range" class="custom-range" min="0" max="10"
+                               v-model.number="computer.quantum">
+                    </div>
                 </div>
             </div>
-        </nav>
+        </div>
 
         <div id="editor-modal" class="modal" tabindex="-1" role="dialog" data-backdrop="static" data-keyboard="false">
             <div class="modal-dialog" role="document">
