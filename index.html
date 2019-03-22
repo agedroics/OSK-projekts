@@ -18,7 +18,7 @@
             text-align: center
         }
         .btn-control {
-            min-width: 32px;
+            min-width: 38px;
         }
     </style>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.slim.min.js"></script>
@@ -30,9 +30,9 @@
         <div class="bg-light py-3 fixed-top">
             <div class="form-group container mb-0">
                 <div class="input-group">
-                    <select class="custom-select" v-model="selected"
-                            :disabled="Object.keys(computer.programs).length === 0">
-                        <option v-for="(program, name) in computer.programs" :value="name">
+                    <select class="custom-select" v-model="selectedProgram"
+                            :disabled="Object.keys(programs).length === 0">
+                        <option v-for="(program, name) in programs" :value="name">
                             {{ name }}
                         </option>
                     </select>
@@ -41,24 +41,24 @@
                             <span class="oi oi-cog"></span>
                         </button>
                         <div class="dropdown-menu dropdown-menu-right">
-                            <button type="button" class="dropdown-item" :disabled="!selected" @click="createProcess()">
+                            <button type="button" class="dropdown-item" :disabled="!selectedProgram" @click="createProcess()">
                                 <span class="oi oi-media-play text-success icon"></span>Run
                             </button>
                             <button type="button" class="dropdown-item" @click="openNew()"
                                     data-toggle="modal" data-target="#editor-modal">
                                 <span class="oi oi-plus icon"></span>Add
                             </button>
-                            <button type="button" class="dropdown-item" :disabled="!selected" @click="openEdit()"
+                            <button type="button" class="dropdown-item" :disabled="!selectedProgram" @click="openEdit()"
                                     data-toggle="modal" data-target="#editor-modal">
                                 <span class="oi oi-pencil icon"></span>Edit
                             </button>
-                            <button type="button" class="dropdown-item" :disabled="!selected" @click="deleteProgram()">
+                            <button type="button" class="dropdown-item" :disabled="!selectedProgram" @click="deleteProgram()">
                                 <span class="oi oi-trash text-danger icon"></span>Delete
                             </button>
                         </div>
 
                         <button type="button" class="btn btn-outline-success d-none d-sm-inline-block" title="Run"
-                                :disabled="!selected" @click="createProcess()">
+                                :disabled="!selectedProgram" @click="createProcess()">
                             <span class="oi oi-media-play"></span>
                         </button>
                         <button type="button" class="btn btn-outline-secondary d-none d-sm-inline-block" title="Add"
@@ -66,11 +66,11 @@
                             <span class="oi oi-plus"></span>
                         </button>
                         <button type="button" class="btn btn-outline-secondary d-none d-sm-inline-block" title="Edit"
-                                :disabled="!selected" @click="openEdit()" data-toggle="modal" data-target="#editor-modal">
+                                :disabled="!selectedProgram" @click="openEdit()" data-toggle="modal" data-target="#editor-modal">
                             <span class="oi oi-pencil"></span>
                         </button>
                         <button type="button" class="btn btn-outline-danger d-none d-sm-inline-block" title="Delete"
-                                :disabled="!selected" @click="deleteProgram()">
+                                :disabled="!selectedProgram" @click="deleteProgram()">
                             <span class="oi oi-trash"></span>
                         </button>
                     </div>
@@ -94,27 +94,27 @@
                             <h3 class="text-center">{{ process.state }}</h3>
                             <p class="text-center align-text-bottom"><code>{{ getInstruction(process) }}</code></p>
                             <div class="btn-group w-100 mb-4">
-                                <button type="button" class="btn btn-sm" title="New" disabled
+                                <button type="button" class="btn" title="New" disabled
                                         :class="process.state === State.NEW ? 'btn-primary' : 'btn-outline-secondary'">
                                     N
                                 </button>
-                                <button type="button" class="btn btn-sm" title="Ready"
+                                <button type="button" class="btn" title="Ready"
                                         :class="process.state === State.READY ? 'btn-primary' : 'btn-outline-secondary'"
                                         :disabled="readyDisabled(process)"
                                         @click="computer.toReady(process.pid)">
                                     Re
                                 </button>
-                                <button type="button" class="btn btn-sm" title="Running"
+                                <button type="button" class="btn" title="Running"
                                         :class="process.state === State.RUNNING ? 'btn-primary' : 'btn-outline-secondary'"
                                         :disabled="runningDisabled(process)"
                                         @click="toRunning(process)">
                                     Ru
                                 </button>
-                                <button type="button" class="btn btn-sm" title="Waiting" disabled
+                                <button type="button" class="btn" title="Waiting" disabled
                                         :class="process.state === State.WAITING ? 'btn-primary' : 'btn-outline-secondary'">
                                     W
                                 </button>
-                                <button type="button" class="btn btn-sm" title="Terminated"
+                                <button type="button" class="btn" title="Terminated"
                                         :class="process.state === State.TERMINATED ? 'btn-primary' : 'btn-outline-secondary'"
                                         :disabled="process.state !== State.RUNNING"
                                         @click="computer.toTerminated(process.pid)">
@@ -124,7 +124,7 @@
                             <table class="table table-sm mb-0">
                                 <tr v-for="(value, register) in process.registers">
                                     <th scope="row">{{ register }}</th>
-                                    <td class="text-right">{{ register === Register.FLAGS ? getFlags(process) : value }}</td>
+                                    <td class="text-right">{{ register === "eflags" ? getFlags(process) : value }}</td>
                                 </tr>
                             </table>
                         </div>
@@ -140,19 +140,19 @@
                         <label class="col-form-label">CPUs:</label>
                     </div>
                     <div class="d-flex flex-nowrap align-items-center col-8 col-sm-9">
-                        <button type="button" class="btn btn-sm btn-outline-secondary btn-control"
+                        <button type="button" class="btn btn-outline-secondary btn-control"
                                 @click="computer.removeCpu()"
                                 :disabled="Object.keys(computer.cpus).length === 0">-</button>
                         <label class="mb-0 mx-3">{{ Object.keys(computer.cpus).length }}</label>
-                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-right btn-control"
+                        <button type="button" class="btn btn-outline-secondary rounded-right btn-control"
                                 @click="computer.addCpu()">+</button>
 
                         <div class="btn-group ml-auto">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Step"
+                            <button type="button" class="btn btn-outline-secondary" title="Step"
                                     @click="computer.doCycle()">
                                 <span class="oi oi-media-step-forward"></span>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-danger" title="Restart"
+                            <button type="button" class="btn btn-outline-danger" title="Restart"
                                     @click="computer.restart()">
                                 <span class="oi oi-reload"></span>
                             </button>
@@ -174,7 +174,7 @@
                     </div>
                     <div class="d-flex align-items-center col-8 col-sm-9">
                         <input id="quantum" type="range" class="custom-range" min="0" max="10"
-                               v-model.number="computer.quantum">
+                               v-model.number="computer.scheduler.quantum">
                     </div>
                 </div>
             </div>
