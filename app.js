@@ -726,7 +726,7 @@ new Vue({
             this.errors = {};
         },
         deleteProgram: function() {
-            Vue.delete(this.programs, this.selected);
+            Vue.delete(this.programs, this.selectedProgram);
             this.selectedProgram = Object.keys(this.programs).length === 0 ? null : Object.keys(this.programs)[0];
         },
         save: function() {
