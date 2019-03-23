@@ -776,6 +776,5 @@ new Vue({
         $("#editor-modal").on("shown.bs.modal", function() {
             codeMirror.refresh();
         });
-        $(".CodeMirror").addClass("form-control p-0");
     }
 });
