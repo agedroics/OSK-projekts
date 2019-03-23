@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.44.0/codemirror.min.css">
     <style>
         html {
             font-size: 16px;
@@ -20,9 +21,19 @@
         .btn-control {
             min-width: 38px;
         }
+        .state-btn-group button {
+            width: 20%;
+            padding-left: .25rem;
+            padding-right: .25rem;
+        }
+        .CodeMirror {
+            min-height: 50vh;
+        }
     </style>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.slim.min.js"></script>
     <script type="text/javascript" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.44.0/codemirror.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.44.0/mode/gas/gas.min.js"></script>
     <title>Process state demo</title>
 </head>
 <body>
@@ -93,7 +104,7 @@
                         <div class="card-body">
                             <h3 class="text-center">{{ process.state }}</h3>
                             <p class="text-center align-text-bottom"><code>{{ getInstruction(process) }}</code></p>
-                            <div class="btn-group w-100 mb-4">
+                            <div class="btn-group w-100 mb-4 state-btn-group">
                                 <button type="button" class="btn" title="New" disabled
                                         :class="process.state === State.NEW ? 'btn-primary' : 'btn-outline-secondary'">
                                     N
@@ -181,7 +192,7 @@
         </div>
 
         <div id="editor-modal" class="modal" tabindex="-1" role="dialog" data-backdrop="static" data-keyboard="false">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Program editor</h5>
@@ -200,54 +211,83 @@
                             <label for="code">Code <a data-toggle="collapse" href="#help" title="Help" role="button">?</a></label>
                             <div id="help" class="collapse">
                                 <div class="card card-body mb-3">
-                                    <h5>Instructions</h5>
-                                    <code>mov <var>target_register</var>, <var>source_register/number</var></code>
-                                    <p>Copies value into register.</p>
-                                    <code>sub <var>target_register</var>, <var>source_register/number</var></code>
-                                    <p>Subtracts value from register and sets flags.</p>
-                                    <code>cmp <var>target_register</var>, <var>source_register/number</var></code>
-                                    <p>Subtracts value from register without storing the result and sets flags.</p>
-                                    <code>jmp <var>label</var></code>
-                                    <p>Jumps to label.</p>
-                                    <code>je <var>label</var></code>
-                                    <p>Jumps to label if ZF is set.</p>
-                                    <code>jne <var>label</var></code>
-                                    <p>Jumps to label if ZF is not set.</p>
-                                    <code>call <var>callable</var></code>
-                                    <hr>
-                                    <h5>Flags</h5>
-                                    <p class="mb-0">Zero flag (ZF): <code>0x0040</code></p>
-                                    <p class="mb-0">Set when the result of an operation is 0.</p>
+                                    <h5>Overview</h5>
+                                    <p class="mb-0">This demo uses a simple programming language inspired by 32bit linux x86 assembly.<br>
+                                        The user-available registers are <code>eax</code> through <code>edx</code> and number literals are supported for immediate values.</p>
                                     <hr>
                                     <h5>Labels</h5>
                                     <p class="mb-0">A label is an <var>identifier</var> followed by a colon.<br>
                                         An <var>identifier</var> consists of alphanumerics and underscores.<br>
                                         Example: <code>begin:</code></p>
                                     <hr>
-                                    <h5>Callables</h5>
-                                    <p>Pass arguments to callables through <var>ecx</var>.<br>
-                                        Return values are stored in <var>eax</var>.</p>
-                                    <code>fork</code>
-                                    <p>Creates a copy of the calling process.<br>
-                                        Takes no arguments.<br>
-                                        Returns child pid for the parent process or 0 for the child.</p>
-                                    <code>wait</code>
-                                    <p>Blocks until a child process is terminated and reaps it.<br>
-                                        Takes pid as argument or -1 to wait for any child.<br>
-                                        Returns 0 on success or -1 on error.</p>
-                                    <code>yield</code>
-                                    <p>Suspends the calling process if there are any waiting processes.<br>
-                                        Takes no arguments.<br>
-                                        Returns 0 on success.</p>
-                                    <code>kill</code>
-                                    <p class="mb-0">Attempts to terminate a process.<br>
-                                        Takes pid as argument.<br>
-                                        Returns 0 on success or -1 on error.</p>
+                                    <h5>Flags</h5>
+                                    <p class="mb-0">Zero flag (ZF) – set if the last operation resulted in 0<br>
+                                        Sign flag (SF) – set if the last operation resulted in a negative value</p>
+                                    <hr>
+                                    <h5>Instructions</h5>
+                                    <p>The following instructions are available:<br>
+                                        <code>mov</code>, <code>cmp</code>, <code>add</code>, <code>sub</code>,
+                                        <code>int</code> (for making system calls)</p>
+                                    <p class="mb-0">And these jump instructions:<br>
+                                        <code>jmp</code>, <code>je</code>, <code>jne</code>, <code>jz</code>,
+                                        <code>jnz</code>, <code>jg</code>, <code>jge</code>, <code>jl</code>,
+                                        <code>jle</code>, <code>js</code>, <code>jns</code>
+                                    </p>
+                                    <hr>
+                                    <h5>System calls</h5>
+                                    <p>Invoke system calls by setting <code>eax</code> to the corresponding value and calling <code>int&nbsp;0x80</code>.<br>
+                                        Arguments are passed through register <code>ebx</code>.<br>
+                                        Return values are stored in <code>eax</code>.</p>
+                                    <table class="table mb-0">
+                                        <thead>
+                                        <tr>
+                                            <th>System call</th>
+                                            <th>eax</th>
+                                            <th>Return value</th>
+                                            <th>ebx</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr>
+                                            <td>sys_exit</td>
+                                            <td>0x01</td>
+                                            <td>-</td>
+                                            <td>-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>sys_fork</td>
+                                            <td>0x02</td>
+                                            <td>Child pid if the parent process or 0 if child</td>
+                                            <td>-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>sys_waitpid</td>
+                                            <td>0x07</td>
+                                            <td>0 on success or -1 on error</td>
+                                            <td>child pid or -1 for all children</td>
+                                        </tr>
+                                        <tr>
+                                            <td>sys_kill</td>
+                                            <td>0x25</td>
+                                            <td>0 on success or -1 on error</td>
+                                            <td>pid or -1 for all processes except self</td>
+                                        </tr>
+                                        <tr>
+                                            <td>sys_sched_yield</td>
+                                            <td>0x9e</td>
+                                            <td>0</td>
+                                            <td>-</td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
-                            <textarea id="code" class="form-control text-monospace" rows="8" v-model="code"
-                                      :class="{'is-invalid': errors.code}"></textarea>
-                            <div class="invalid-feedback" v-if="errors.code">{{ errors.code }}</div>
+                            <textarea id="code" class="form-control" rows="8" :class="{'is-invalid': errors.code}"></textarea>
+                            <div class="invalid-feedback">
+                                <p class="mb-0" v-for="error in errors.code">
+                                    Error on line {{ parseInt(error.lineNumber) + 1 }}: {{ error.msg }}
+                                </p>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
