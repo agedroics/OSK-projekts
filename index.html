@@ -26,9 +26,6 @@
             padding-left: .25rem;
             padding-right: .25rem;
         }
-        .CodeMirror {
-            min-height: 50vh;
-        }
     </style>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.slim.min.js"></script>
     <script type="text/javascript" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
@@ -135,7 +132,7 @@
                             <table class="table table-sm mb-0">
                                 <tr v-for="(value, register) in process.registers">
                                     <th scope="row">{{ register }}</th>
-                                    <td class="text-right">{{ register === "eflags" ? getFlags(process) : value }}</td>
+                                    <td class="text-right text-monospace">{{ register === "flags" ? getFlags(process) : toHexString(value) }}</td>
                                 </tr>
                             </table>
                         </div>
@@ -213,32 +210,38 @@
                                 <div class="card card-body mb-3">
                                     <h5>Overview</h5>
                                     <p class="mb-0">This demo uses a simple programming language inspired by 32bit linux x86 assembly.<br>
-                                        The user-available registers are <code>eax</code> through <code>edx</code> and number literals are supported for immediate values.</p>
+                                        The user-available registers are <code>eax</code> through <code>edx</code> and number literals are supported for immediate values.<br>
+                                        Single-line comments are prefixed by <code>#</code></p>
                                     <hr>
                                     <h5>Labels</h5>
-                                    <p class="mb-0">A label is an <var>identifier</var> followed by a colon.<br>
+                                    <p class="mb-0">A label is an <var>identifier</var> followed by <code>:</code><br>
                                         An <var>identifier</var> consists of alphanumerics and underscores.<br>
                                         Example: <code>begin:</code></p>
                                     <hr>
                                     <h5>Flags</h5>
-                                    <p class="mb-0">Zero flag (ZF) – set if the last operation resulted in 0<br>
-                                        Sign flag (SF) – set if the last operation resulted in a negative value</p>
+                                    <p class="mb-0">Carry flag (CF) – set if the last operation caused a carry/borrow.<br>
+                                        Zero flag (ZF) – set if the last operation resulted in 0.<br>
+                                        Sign flag (SF) – set if the last operation resulted in a negative value.<br>
+                                        Overflow flag (OF) – set if the last operation caused a signed overflow.</p>
                                     <hr>
                                     <h5>Instructions</h5>
                                     <p>The following instructions are available:<br>
                                         <code>mov</code>, <code>cmp</code>, <code>add</code>, <code>sub</code>,
-                                        <code>int</code> (for making system calls)</p>
+                                        <code>inc</code>, <code>dec</code>, <code>and</code>, <code>or</code>,
+                                        <code>xor</code>, <code>not</code>, <code>neg</code> and <code>int</code> (for making system calls)</p>
                                     <p class="mb-0">And these jump instructions:<br>
                                         <code>jmp</code>, <code>je</code>, <code>jne</code>, <code>jz</code>,
-                                        <code>jnz</code>, <code>jg</code>, <code>jge</code>, <code>jl</code>,
-                                        <code>jle</code>, <code>js</code>, <code>jns</code>
+                                        <code>jnz</code>, <code>jg</code>, <code>jge</code>, <code>ja</code>,
+                                        <code>jae</code>, <code>jl</code>, <code>jle</code>, <code>jb</code>,
+                                        <code>jbe</code>, <code>jo</code>, <code>jno</code>, <code>js</code>,
+                                        <code>jns</code>
                                     </p>
                                     <hr>
                                     <h5>System calls</h5>
                                     <p>Invoke system calls by setting <code>eax</code> to the corresponding value and calling <code>int&nbsp;0x80</code>.<br>
                                         Arguments are passed through register <code>ebx</code>.<br>
                                         Return values are stored in <code>eax</code>.</p>
-                                    <table class="table mb-0">
+                                    <table class="table table-sm table-bordered table-responsive mb-0">
                                         <thead>
                                         <tr>
                                             <th>System call</th>

@@ -9,8 +9,10 @@ var State = {
 };
 
 var Flag = {
+    CF: 0x0001,
     ZF: 0x0040,
-    SF: 0x0080
+    SF: 0x0080,
+    OF: 0x0800
 };
 
 var registers = ["eax", "ebx", "ecx", "edx"];
@@ -20,7 +22,7 @@ function Registers() {
         this[registers[i]] = 0;
     }
     this.eip = 0;
-    this.eflags = 0;
+    this.flags = 0;
 }
 
 function Process(pid, ppid, program) {
@@ -31,15 +33,37 @@ function Process(pid, ppid, program) {
 }
 
 Process.prototype.isFlag = function(flag) {
-    return (this.registers.eflags & flag) !== 0;
+    return (this.registers.flags & flag) !== 0;
 };
 
 Process.prototype.setFlag = function(flag, set) {
     if (set) {
-        this.registers.eflags |= flag;
+        this.registers.flags |= flag;
     } else {
-        this.registers.eflags &= ~flag;
+        this.registers.flags &= ~flag;
     }
+};
+
+Process.prototype.setFlags = function(unsignedResult, signedResult) {
+    this.setFlag(Flag.CF, (unsignedResult >>> 0) !== unsignedResult);
+    this.setFlag(Flag.ZF, (unsignedResult >>> 0) === 0);
+    this.setFlag(Flag.SF, (signedResult | 0) < 0);
+    this.setFlag(Flag.OF, (signedResult | 0) !== signedResult);
+};
+
+Process.prototype.doArithmetic = function(f) {
+    var unsignedArgs = [];
+    var signedArgs = [];
+    for (var i = 1; i < arguments.length; ++i) {
+        var arg = arguments[i];
+        var value = arg.constructor === Operand.Register ? this.registers[arg.value] : arg.value;
+        unsignedArgs.push(value >>> 0);
+        signedArgs.push(value | 0);
+    }
+    var unsignedResult = f.apply(this, unsignedArgs);
+    var signedResult = f.apply(this, signedArgs);
+    this.setFlags(unsignedResult, signedResult);
+    return unsignedResult;
 };
 
 function Program(code, instructions, labels) {
@@ -56,7 +80,7 @@ var Operand = {
         }
     },
     Immediate: function(value) {
-        this.value = parseInt(value);
+        this.value = parseInt(value) >>> 0;
         this.toString = function() {
             return value;
         }
@@ -98,92 +122,116 @@ function parseOperand(value) {
     return null;
 }
 
-function setFlags(process, result) {
-    process.setFlag(Flag.ZF, result === 0);
-    process.setFlag(Flag.SF, result < 0);
-}
-
 function ConditionalJump(condition) {
-    this.operands = [
-        Operand.Label
-    ];
+    this.operands = [Operand.Label];
     this.execute = function(process, label) {
         if (condition(process)) {
             process.registers.eip = process.program.labels[label.value];
-        } else {
-            ++process.registers.eip;
         }
     }
 }
 
 var Instruction = {
     mov: {
-        operands: [
-            Operand.Register,
-            [Operand.Register, Operand.Immediate]
-        ],
+        operands: [Operand.Register, [Operand.Register, Operand.Immediate]],
         execute: function(process, target, src) {
             process.registers[target.value] = src.constructor === Operand.Register ? process.registers[src.value] : src.value;
-            ++process.registers.eip;
-        }
-    },
-    add: {
-        operands: [
-            Operand.Register,
-            [Operand.Register, Operand.Immediate]
-        ],
-        execute: function(process, target, src) {
-            var srcVal = src.constructor === Operand.Register ? process.registers[src.value] : src.value;
-            process.registers[target.value] += srcVal;
-            setFlags(process, process.registers[target.value]);
-            ++process.registers.eip;
-        }
-    },
-    sub: {
-        operands: [
-            Operand.Register,
-            [Operand.Register, Operand.Immediate]
-        ],
-        execute: function(process, target, src) {
-            var srcVal = src.constructor === Operand.Register ? process.registers[src.value] : src.value;
-            process.registers[target.value] -= srcVal;
-            setFlags(process, process.registers[target.value]);
-            ++process.registers.eip;
         }
     },
     cmp: {
-        operands: [
-            Operand.Register,
-            [Operand.Register, Operand.Immediate]
-        ],
+        operands: [Operand.Register, [Operand.Register, Operand.Immediate]],
         execute: function(process, l, r) {
-            var rVal = r.constructor === Operand.Register ? process.registers[r.value] : r.value;
-            setFlags(process, process.registers[l.value] - rVal);
-            ++process.registers.eip;
+            process.doArithmetic(function(x, y) {return x - y}, l, r);
+        }
+    },
+    add: {
+        operands: [Operand.Register, [Operand.Register, Operand.Immediate]],
+        execute: function(process, target, src) {
+            process.registers[target.value] = process.doArithmetic(function(x, y) {return x + y}, target, src);
+        }
+    },
+    sub: {
+        operands: [Operand.Register, [Operand.Register, Operand.Immediate]],
+        execute: function(process, target, src) {
+            process.registers[target.value] = process.doArithmetic(function(x, y) {return x - y}, target, src);
+        }
+    },
+    inc: {
+        operands: [Operand.Register],
+        execute: function(process, target) {
+            var cf = process.isFlag(Flag.CF);
+            process.registers[target.value] = process.doArithmetic(function(x) {return ++x}, target);
+            process.setFlag(Flag.CF, cf);
+        }
+    },
+    dec: {
+        operands: [Operand.Register],
+        execute: function(process, target) {
+            var cf = process.isFlag(Flag.CF);
+            process.registers[target.value] = process.doArithmetic(function(x) {return --x}, target);
+            process.setFlag(Flag.CF, cf);
+        }
+    },
+    and: {
+        operands: [Operand.Register, [Operand.Register, Operand.Immediate]],
+        execute: function(process, target, src) {
+            process.registers[target.value] = process.doArithmetic(function(x, y) {return x & y}, target, src);
+            process.setFlag(Flag.CF, false);
+            process.setFlag(Flag.OF, false);
+        }
+    },
+    or: {
+        operands: [Operand.Register, [Operand.Register, Operand.Immediate]],
+        execute: function(process, target, src) {
+            process.registers[target.value] = process.doArithmetic(function(x, y) {return x | y}, target, src);
+            process.setFlag(Flag.CF, false);
+            process.setFlag(Flag.OF, false);
+        }
+    },
+    xor: {
+        operands: [Operand.Register, [Operand.Register, Operand.Immediate]],
+        execute: function(process, target, src) {
+            process.registers[target.value] = process.doArithmetic(function(x, y) {return x ^ y}, target, src);
+            process.setFlag(Flag.CF, false);
+            process.setFlag(Flag.OF, false);
+        }
+    },
+    not: {
+        operands: [Operand.Register],
+        execute: function(process, target) {
+            process.registers[target.value] = ~process.registers[target.value];
+        }
+    },
+    neg: {
+        operands: [Operand.Register],
+        execute: function(process, target) {
+            process.registers[target.value] = process.doArithmetic(function(x) {return -x}, target);
         }
     },
     int: {
-        operands: [
-            Operand.Immediate
-        ],
+        operands: [Operand.Immediate],
         execute: function(process, interrupt) {
             if (interrupt.value === 0x80) {
                 var sysCall = sysCalls[process.registers.eax];
                 if (sysCall) {
                     sysCall.call(this, process.pid);
-                    return;
                 }
             }
-            ++process.registers.eip;
         }
     },
     jmp: new ConditionalJump(function() {return true}),
     je: new ConditionalJump(function(process) {return process.isFlag(Flag.ZF)}),
     jne: new ConditionalJump(function(process) {return !process.isFlag(Flag.ZF)}),
-    jg: new ConditionalJump(function(process) {return !process.isFlag(Flag.SF) && !process.isFlag(Flag.ZF)}),
-    jge: new ConditionalJump(function(process) {return !process.isFlag(Flag.SF) || process.isFlag(Flag.ZF)}),
-    jl: new ConditionalJump(function(process) {return process.isFlag(Flag.SF) && !process.isFlag(Flag.ZF)}),
-    jle: new ConditionalJump(function(process) {return process.isFlag(Flag.SF) || process.isFlag(Flag.ZF)}),
+    jg: new ConditionalJump(function(process) {return process.isFlag(Flag.SF) === process.isFlag(Flag.OF) && !process.isFlag(Flag.ZF)}),
+    jge: new ConditionalJump(function(process) {return process.isFlag(Flag.SF) === process.isFlag(Flag.OF) || process.isFlag(Flag.ZF)}),
+    ja: new ConditionalJump(function(process) {return !process.isFlag(Flag.CF) && !process.isFlag(Flag.ZF)}),
+    jae: new ConditionalJump(function(process) {return !process.isFlag(Flag.CF) || process.isFlag(Flag.ZF)}),
+    jl: new ConditionalJump(function(process) {return process.isFlag(Flag.SF) !== process.isFlag(Flag.OF)}),
+    jle: new ConditionalJump(function(process) {return process.isFlag(Flag.SF) !== process.isFlag(Flag.OF) || process.isFlag(Flag.ZF)}),
+    jb: new ConditionalJump(function(process) {return process.isFlag(Flag.CF)}),
+    jbe: new ConditionalJump(function(process) {return process.isFlag(Flag.CF) || process.isFlag(Flag.ZF)}),
+    jo: new ConditionalJump(function (process) {return process.isFlag(Flag.OF)}),
+    jno: new ConditionalJump(function (process) {return !process.isFlag(Flag.OF)}),
     js: new ConditionalJump(function(process) {return process.isFlag(Flag.SF)}),
     jns: new ConditionalJump(function(process) {return !process.isFlag(Flag.SF)})
 };
@@ -427,7 +475,7 @@ Computer.prototype.processIsWaitingFor = function(parentPid, childPid) {
     }
     var parent = this.processes[parentPid];
     if (parent) {
-        var arg = parent.registers.ebx;
+        var arg = parent.registers.ebx | 0;
         return parent.waitpid && parent.state === State.WAITING && (arg === -1 || arg === childPid);
     } else {
         return false;
@@ -469,15 +517,15 @@ Computer.prototype.toTerminated = function(pid) {
 };
 
 Computer.prototype.exit = function(pid) {
-    this.toTerminated(pid);
-    ++this.processes[pid].registers.eip;
+    this.stateChanges.push(function() {
+        this.toTerminated(pid);
+    });
 };
 
 Computer.prototype.fork = function(pid) {
     var process = this.processes[pid];
     var forkedProcess = new Process(this.pidCounter++, pid, process.program);
     process.registers.eax = forkedProcess.pid;
-    ++process.registers.eip;
     forkedProcess.registers = JSON.parse(JSON.stringify(process.registers));
     forkedProcess.registers.eax = 0;
     this.toNew(forkedProcess);
@@ -485,7 +533,7 @@ Computer.prototype.fork = function(pid) {
 
 Computer.prototype.waitpid = function(pid) {
     var process = this.processes[pid];
-    var arg = process.registers.ebx;
+    var arg = process.registers.ebx | 0;
     if (arg === -1) {
         var self = this;
         var children = Object.keys(this.processes).filter(function(childPid) {
@@ -498,8 +546,8 @@ Computer.prototype.waitpid = function(pid) {
     }
     if (children.length === 0) {
         process.registers.eax = -1;
-        ++process.registers.eip;
     } else {
+        --process.registers.eip;
         for (var i in children) {
             var child = this.processes[children[i]];
             if (child.state === State.TERMINATED) {
@@ -514,7 +562,7 @@ Computer.prototype.waitpid = function(pid) {
 
 Computer.prototype.kill = function(pid) {
     var process = this.processes[pid];
-    var arg = process.registers.ebx;
+    var arg = process.registers.ebx | 0;
     var targets = [];
     if (arg === -1) {
         for (var otherPidStr in this.processes) {
@@ -552,7 +600,6 @@ Computer.prototype.kill = function(pid) {
         })(target));
         process.registers.eax = 0;
     }
-    ++process.registers.eip;
 };
 
 Computer.prototype.sched_yield = function(pid) {
@@ -561,7 +608,6 @@ Computer.prototype.sched_yield = function(pid) {
     }
     var process = this.processes[pid];
     this.processes[pid].registers.eax = 0;
-    ++process.registers.eip;
 };
 
 var sysCalls = {
@@ -592,7 +638,10 @@ Computer.prototype.doCycle = function() {
                     }
                 })(process));
             } else {
-                process.program.instructions[process.registers.eip].execute.call(this, process);
+                process.program.instructions[process.registers.eip++].execute.call(this, process);
+                for (var register in process.registers) {
+                    process.registers[register] >>>= 0;
+                }
             }
         }
     }
@@ -650,6 +699,13 @@ new Vue({
             }
             return flags.length ? flags.join(" ") : "-";
         },
+        toHexString: function(number) {
+            var value = (number >>> 0).toString(16);
+            while (value.length < 8) {
+                value = 0 + value;
+            }
+            return "0x" + value;
+        },
         getInstruction: function(process) {
             return process.registers.eip >= process.program.instructions.length || process.registers.eip < 0
                 ? "-"
@@ -661,7 +717,7 @@ new Vue({
         },
         openNew: function() {
             this.name = "";
-            this.codeMirror.setValue();
+            this.codeMirror.setValue("");
             this.errors = {};
         },
         openEdit: function() {
@@ -713,9 +769,9 @@ new Vue({
     mounted: function() {
         var codeMirror = CodeMirror.fromTextArea(document.getElementById("code"), {
             lineNumbers: true,
+            inputStyle: "textarea",
             architecture: "x86"
         });
-        var markers = [];
         this.codeMirror = codeMirror;
         $("#editor-modal").on("shown.bs.modal", function() {
             codeMirror.refresh();
