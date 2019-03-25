@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.44.0/codemirror.min.css">
-    <style>
+    <style type="text/css">
         html {
             font-size: 16px;
         }
@@ -26,16 +25,19 @@
             padding-left: .25rem;
             padding-right: .25rem;
         }
-        .CodeMirror {
+        #editor-wrapper {
+            min-height: 250px;
+            height: calc(80vh - 300px);
+            overflow: hidden;
+        }
+        #editor {
+            height: 100%;
             font-size: 14px;
-            border: 1px solid #ced4da;
-            border-radius: .25rem;
         }
     </style>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.slim.min.js"></script>
     <script type="text/javascript" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.44.0/codemirror.min.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.44.0/mode/gas/gas.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.3/ace.js"></script>
     <title>Process state demo</title>
 </head>
 <body>
@@ -210,13 +212,13 @@
                             <div class="invalid-feedback" v-if="errors.name">{{ errors.name }}</div>
                         </div>
                         <div class="form-group">
-                            <label for="code">Code <a data-toggle="collapse" href="#help" title="Help" role="button">?</a></label>
+                            <label for="editor">Code <a data-toggle="collapse" href="#help" title="Help" role="button">?</a></label>
                             <div id="help" class="collapse">
                                 <div class="card card-body mb-3">
                                     <h5>Overview</h5>
                                     <p class="mb-0">This demo uses a simple programming language inspired by 32bit linux x86 assembly.<br>
                                         The user-available registers are <code>eax</code> through <code>edx</code> and number literals are supported for immediate values.<br>
-                                        Single-line comments are prefixed by <code>#</code></p>
+                                        Single-line comments are prefixed by <code>;</code></p>
                                     <hr>
                                     <h5>Labels</h5>
                                     <p class="mb-0">A label is an <var>identifier</var> followed by <code>:</code><br>
@@ -290,7 +292,9 @@
                                     </table>
                                 </div>
                             </div>
-                            <textarea id="code" class="form-control" rows="8" :class="{'is-invalid': errors.code}"></textarea>
+                            <div id="editor-wrapper" class="form-control p-0" :class="{'is-invalid': errors.code}">
+                                <div id="editor"></div>
+                            </div>
                             <div class="invalid-feedback">
                                 <p class="mb-0" v-for="error in errors.code">
                                     Error on line {{ parseInt(error.lineNumber) + 1 }}: {{ error.msg }}

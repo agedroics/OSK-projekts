@@ -238,7 +238,7 @@ Instruction.jnz = Instruction.jne;
 
 Program.compile = function(code) {
     var lines = code.split("\n");
-    var regex = /^\s*(?:([a-z_]\w*):)?\s*(?:([a-z]+)\s*(?:\s((?:[^\s,#]+)(?:\s*,\s*(?:[^\s,#]+))*)\s*)?)?(?:#.*)?$/i;
+    var regex = /^\s*(?:([a-z_]\w*):)?\s*(?:([a-z]+)\s*(?:\s((?:[^\s,;]+)(?:\s*,\s*(?:[^\s,;]+))*)\s*)?)?(?:;.*)?$/i;
     var instructions = [];
     var labels = {};
     var errors = [];
@@ -650,7 +650,7 @@ Computer.prototype.getFreeCpu = function() {
 };
 
 (function() {
-    var codeMirror = null;
+    var editor = null;
     var intervalId = null;
 
     new Vue({
@@ -705,12 +705,12 @@ Computer.prototype.getFreeCpu = function() {
             },
             openNew: function() {
                 this.name = "";
-                codeMirror.setValue("");
+                editor.session.setValue("");
                 this.errors = {};
             },
             openEdit: function() {
                 this.name = this.selectedProgram;
-                codeMirror.setValue(this.programs[this.selectedProgram].code);
+                editor.session.setValue(this.programs[this.selectedProgram].code);
                 this.errors = {};
             },
             deleteProgram: function() {
@@ -723,7 +723,7 @@ Computer.prototype.getFreeCpu = function() {
                     Vue.set(this.errors, "name", "Please provide a name");
                 }
                 try {
-                    var program = Program.compile(codeMirror.getValue());
+                    var program = Program.compile(editor.getValue());
                     if (!this.errors.name) {
                         Vue.set(this.programs, this.name, program);
                         this.selectedProgram = this.name;
@@ -755,13 +755,9 @@ Computer.prototype.getFreeCpu = function() {
             this.computer.addCpu();
         },
         mounted: function() {
-            codeMirror = CodeMirror.fromTextArea(document.getElementById("code"), {
-                lineNumbers: true,
-                architecture: "x86"
-            });
-            $("#editor-modal").on("shown.bs.modal", function() {
-                codeMirror.refresh();
-            });
+            editor = ace.edit("editor");
+            editor.session.setMode("ace/mode/assembly_x86");
+            editor.session.setUseSoftTabs(true);
         }
     });
 })();
