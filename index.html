@@ -137,7 +137,7 @@
                             <table class="table table-sm mb-0">
                                 <tr v-for="(value, register) in process.registers">
                                     <th scope="row">{{ register }}</th>
-                                    <td class="text-right text-monospace">{{ register === "flags" ? getFlags(process) : toHexString(value) }}</td>
+                                    <td class="text-right text-monospace">{{ register === "eflags" ? getFlags(process) : toHexString(value) }}</td>
                                 </tr>
                             </table>
                         </div>
