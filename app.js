@@ -673,7 +673,7 @@ Computer.prototype.getFreeCpu = function() {
                     var self = this;
                     intervalId = setInterval(function() {
                         self.computer.doCycle();
-                    }, 2000 / val);
+                    }, 1000 / Math.pow(2, val - 1));
                 }
             }
         },
@@ -749,7 +749,7 @@ Computer.prototype.getFreeCpu = function() {
             }
         },
         created: function() {
-            this.speed = 2;
+            this.speed = 1;
             this.programs.init = this.computer.initProgram;
             this.selectedProgram = "init";
             this.computer.addCpu();
