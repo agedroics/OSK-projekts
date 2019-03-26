@@ -80,7 +80,11 @@ var Operand = {
         }
     },
     Immediate: function(value) {
-        this.value = parseInt(value) >>> 0;
+        if (!isNaN(value)) {
+            this.value = parseInt(value) >>> 0;
+        } else {
+            this.value = parseInt(value.slice(0, -1), 16) >>> 0;
+        }
         this.toString = function() {
             return value;
         }
@@ -106,7 +110,7 @@ Operand.Register.test = function(value) {
 };
 
 Operand.Immediate.test = function(value) {
-    return /^[+-]?(?:[0-9]+|0x[0-9a-f]+)$/i.test(value);
+    return /^[+-]?(?:[0-9]+|0x[0-9a-f]+|[0-9][0-9a-f]*h)$/i.test(value);
 };
 Operand.Immediate.ONE = new Operand.Immediate("1");
 
@@ -209,6 +213,14 @@ var Instruction = {
             var cf = process.isFlag(Flag.CF);
             process.registers[target.value] = process.doArithmetic(function(x) {return --x}, target);
             process.setFlag(Flag.CF, cf);
+        }
+    },
+    test: {
+        operands: [Operand.Register, [Operand.Register, Operand.Immediate]],
+        execute: function(process, target, src) {
+            process.doArithmetic(function(x, y) {return x & y}, target, src);
+            process.setFlag(Flag.CF, false);
+            process.setFlag(Flag.OF, false);
         }
     },
     and: {
@@ -445,7 +457,7 @@ function Cpu() {
 function Computer() {
     this.cpus = {};
     this.scheduler = new Scheduler(5);
-    this.initProgram = Program.compile("mov ebx, -1\nbegin:\nmov eax, 0x07\nint 0x80\njmp begin");
+    this.initProgram = Program.compile("mov ebx, -1\nbegin:\nmov eax, 07h\nint 80h\njmp begin");
     this.restart();
 }
 

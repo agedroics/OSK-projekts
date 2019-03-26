@@ -230,9 +230,10 @@
                                     <h5>Instructions</h5>
                                     <p>The following instructions are available:<br>
                                         <code>mov</code>, <code>cmp</code>, <code>add</code>, <code>sub</code>,
-                                        <code>inc</code>, <code>dec</code>, <code>and</code>, <code>or</code>,
-                                        <code>xor</code>, <code>sal</code>/<code>shl</code>, <code>sar</code>,
-                                        <code>shr</code>, <code>not</code>, <code>neg</code> and <code>int</code> (for making system calls)</p>
+                                        <code>inc</code>, <code>dec</code>, <code>test</code>, <code>and</code>,
+                                        <code>or</code>, <code>xor</code>, <code>sal</code>/<code>shl</code>,
+                                        <code>sar</code>, <code>shr</code>, <code>not</code>, <code>neg</code> and
+                                        <code>int</code> (for making system calls)</p>
                                     <p class="mb-0">And these jump instructions:<br>
                                         <code>jmp</code>, <code>jz</code>/<code>je</code>, <code>jnz</code>/<code>jne</code>,
                                         <code>jg</code>, <code>jge</code>, <code>ja</code>, <code>jae</code>,
@@ -243,7 +244,7 @@
                                     </p>
                                     <hr>
                                     <h5>System calls</h5>
-                                    <p>Invoke system calls by setting <code>eax</code> to the corresponding value and calling <code>int&nbsp;0x80</code>.<br>
+                                    <p>Invoke system calls by setting <code>eax</code> to the corresponding value and calling <code>int&nbsp;80h</code>.<br>
                                         Arguments are passed through register <code>ebx</code>.<br>
                                         Return values are stored in <code>eax</code>.</p>
                                     <table class="table table-sm table-bordered table-responsive mb-0">
