@@ -108,6 +108,7 @@ Operand.Register.test = function(value) {
 Operand.Immediate.test = function(value) {
     return /^[+-]?(?:[0-9]+|0x[0-9a-f]+)$/i.test(value);
 };
+Operand.Immediate.ONE = new Operand.Immediate("1");
 
 Operand.Label.test = function(value) {
     return /^[a-z_]\w*$/i.test(value) && !Operand.Register.test(value)
@@ -128,7 +129,45 @@ function ConditionalJump(condition) {
         if (condition(process)) {
             process.registers.eip = process.program.labels[label.value];
         }
-    }
+    };
+}
+
+function Shift(mnemonic) {
+    this.operands = [Operand.Register, [Operand.Register, Operand.Immediate, null]];
+    this.execute = function(process, target, src) {
+        if (typeof src === "undefined") {
+            src = Operand.Immediate.ONE;
+        }
+        var result = process.registers[target.value];
+        var shift = (src.constructor === Operand.Register ? this.registers[src.value] : src.value) & 0x1f;
+        for (var i = 0; i < shift; ++i) {
+            if (mnemonic === "sal" || mnemonic === "shl") {
+                process.setFlag(Flag.CF, result & 0x80000000);
+                result <<= 1;
+            } else {
+                process.setFlag(Flag.CF, result & 1);
+                if (mnemonic === "sar") {
+                    result >>= 1;
+                } else {
+                    result >>>= 1;
+                }
+            }
+        }
+        if (shift) {
+            process.setFlag(Flag.ZF, (result >>> 0) === 0);
+            process.setFlag(Flag.SF, (result | 0) < 0);
+            if (shift === 1) {
+                if (mnemonic === "sal" || mnemonic === "shl") {
+                    process.setFlag(Flag.OF, !!(result & 0x80000000) !== process.isFlag(Flag.CF));
+                } else if (mnemonic === "sar") {
+                    process.setFlag(Flag.OF, false);
+                } else {
+                    process.setFlag(Flag.OF, process.registers[target.value] & 0x80000000);
+                }
+            }
+            process.registers[target.value] = result;
+        }
+    };
 }
 
 var Instruction = {
@@ -196,6 +235,10 @@ var Instruction = {
             process.setFlag(Flag.OF, false);
         }
     },
+    sal: new Shift("sal"),
+    shl: new Shift("shl"),
+    sar: new Shift("sar"),
+    shr: new Shift("shr"),
     not: {
         operands: [Operand.Register],
         execute: function(process, target) {
@@ -217,8 +260,8 @@ var Instruction = {
         }
     },
     jmp: new ConditionalJump(function() {return true}),
-    je: new ConditionalJump(function(process) {return process.isFlag(Flag.ZF)}),
-    jne: new ConditionalJump(function(process) {return !process.isFlag(Flag.ZF)}),
+    jz: new ConditionalJump(function(process) {return process.isFlag(Flag.ZF)}),
+    jnz: new ConditionalJump(function(process) {return !process.isFlag(Flag.ZF)}),
     jg: new ConditionalJump(function(process) {return process.isFlag(Flag.SF) === process.isFlag(Flag.OF) && !process.isFlag(Flag.ZF)}),
     jge: new ConditionalJump(function(process) {return process.isFlag(Flag.SF) === process.isFlag(Flag.OF) || process.isFlag(Flag.ZF)}),
     ja: new ConditionalJump(function(process) {return !process.isFlag(Flag.CF) && !process.isFlag(Flag.ZF)}),
@@ -230,11 +273,16 @@ var Instruction = {
     jo: new ConditionalJump(function (process) {return process.isFlag(Flag.OF)}),
     jno: new ConditionalJump(function (process) {return !process.isFlag(Flag.OF)}),
     js: new ConditionalJump(function(process) {return process.isFlag(Flag.SF)}),
-    jns: new ConditionalJump(function(process) {return !process.isFlag(Flag.SF)})
+    jns: new ConditionalJump(function(process) {return !process.isFlag(Flag.SF)}),
+    loop: new ConditionalJump(function(process) {return --process.registers.ecx}),
+    loopz: new ConditionalJump(function(process) {return --process.registers.ecx && process.isFlag(Flag.ZF)}),
+    loopnz: new ConditionalJump(function(process) {return --process.registers.ecx && !process.isFlag(Flag.ZF)})
 };
 
-Instruction.jz = Instruction.je;
-Instruction.jnz = Instruction.jne;
+Instruction.je = Instruction.jz;
+Instruction.jne = Instruction.jnz;
+Instruction.loope = Instruction.loopz;
+Instruction.loopne = Instruction.loopnz;
 
 Program.compile = function(code) {
     var lines = code.split("\n");
@@ -286,9 +334,14 @@ Program.compile = function(code) {
                     continue;
                 }
                 var instruction = Instruction[mnemonic];
-                if (instruction.operands.length === operands.length) {
+                for (var requiredOperandsCount = 0;
+                     requiredOperandsCount < instruction.operands.length &&
+                         (!Array.isArray(instruction.operands[requiredOperandsCount]) ||
+                             instruction.operands[requiredOperandsCount].indexOf(null) === -1);
+                     ++requiredOperandsCount);
+                if (operands.length >= requiredOperandsCount && operands.length <= instruction.operands.length) {
                     var labelOperands = [];
-                    for (i in instruction.operands) {
+                    for (i = 0; i < instruction.operands.length && i < operands.length; ++i) {
                         if (Array.isArray(instruction.operands[i]) && instruction.operands[i].indexOf(operands[i].constructor) === -1 ||
                             !Array.isArray(instruction.operands[i]) && instruction.operands[i] !== operands[i].constructor) {
 
@@ -329,7 +382,8 @@ Program.compile = function(code) {
                 } else {
                     errors.push({
                         lineNumber: lineNumber,
-                        msg: "invalid number of operands (" + operands.length + ", expected " + Instruction[mnemonic].operands.length + ")"
+                        msg: "invalid number of operands (" + operands.length + ", expected min " + requiredOperandsCount +
+                            ", max " + instruction.operands.length + ")"
                     });
                 }
             } else {
