@@ -500,6 +500,7 @@ Computer.prototype.toReady = function(pid) {
         throw new Error("Invalid state transition: " + process.state + " => " + State.READY);
     }
     process.state = State.READY;
+    delete parent.waitpid;
     this.queue.push(process);
     if (process.hasOwnProperty("cpu")) {
         this.cpus[process.cpu].pid = null;
@@ -550,7 +551,6 @@ Computer.prototype.waitpidReturn = function(parentPid, childPid) {
     var child = this.processes[childPid];
     parent.registers.eax = child.pid;
     Vue.delete(this.processes, child.pid);
-    delete parent.waitpid;
     if (parent.state === State.WAITING) {
         this.toReady(parentPid);
     }
