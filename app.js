@@ -120,7 +120,7 @@ Operand.Label.test = function(value) {
 
 Operand.parse = function(value) {
     for (var i in Operand) {
-        if (Operand[i].test(value)) {
+        if (Operand[i].hasOwnProperty("test") && Operand[i].test(value)) {
             return new Operand[i](value);
         }
     }
@@ -715,6 +715,36 @@ Computer.prototype.getFreeCpu = function() {
     return null;
 };
 
+function TempStorage() {
+    this.items = {};
+}
+
+Object.defineProperty(TempStorage.prototype, "length", {get: function() {
+    return Object.keys(this.items).length;
+}});
+
+TempStorage.prototype.getItem = function(key) {
+    if (this.items.hasOwnProperty(key)) {
+        return this.items[key];
+    }
+    return null;
+};
+
+TempStorage.prototype.setItem = function(key, value) {
+    this.items[key] = value;
+};
+
+TempStorage.prototype.removeItem = function(key) {
+    delete this.items[key];
+};
+
+TempStorage.prototype.key = function(index) {
+    if (this.length > index) {
+        return Object.keys(this.items)[index];
+    }
+    return null;
+};
+
 (function() {
     var editor = null;
     var intervalId = null;
@@ -723,7 +753,7 @@ Computer.prototype.getFreeCpu = function() {
         el: "#app",
         data: {
             computer: new Computer(),
-            programs: {},
+            programs: localStorage ? localStorage : new TempStorage(),
             selectedProgram: null,
             name: "",
             errors: {},
@@ -766,7 +796,8 @@ Computer.prototype.getFreeCpu = function() {
                     : process.program.instructions[process.registers.eip];
             },
             createProcess: function() {
-                var process = new Process(this.computer.pidCounter++, 1, this.programs[this.selectedProgram]);
+                var program = Program.compile(this.programs.getItem(this.selectedProgram));
+                var process = new Process(this.computer.pidCounter++, 1, program);
                 this.computer.toNew(process);
             },
             openNew: function() {
@@ -776,12 +807,12 @@ Computer.prototype.getFreeCpu = function() {
             },
             openEdit: function() {
                 this.name = this.selectedProgram;
-                editor.session.setValue(this.programs[this.selectedProgram].code);
+                editor.session.setValue(this.programs.getItem(this.selectedProgram));
                 this.errors = {};
             },
             deleteProgram: function() {
-                Vue.delete(this.programs, this.selectedProgram);
-                this.selectedProgram = Object.keys(this.programs).length === 0 ? null : Object.keys(this.programs)[0];
+                this.programs.removeItem(this.selectedProgram);
+                this.selectedProgram = this.programs.length === 0 ? null : this.programs.key(0);
             },
             save: function() {
                 this.errors = {};
@@ -789,9 +820,9 @@ Computer.prototype.getFreeCpu = function() {
                     Vue.set(this.errors, "name", "Please provide a name");
                 }
                 try {
-                    var program = Program.compile(editor.getValue());
+                    Program.compile(editor.getValue());
                     if (!this.errors.name) {
-                        Vue.set(this.programs, this.name, program);
+                        this.programs.setItem(this.name, editor.getValue());
                         this.selectedProgram = this.name;
                         $("#editor-modal").modal("hide");
                     }
@@ -816,7 +847,7 @@ Computer.prototype.getFreeCpu = function() {
         },
         created: function() {
             this.speed = 1;
-            this.programs.init = this.computer.initProgram;
+            this.programs.setItem("init", this.computer.initProgram.code);
             this.selectedProgram = "init";
             this.computer.addCpu();
         },

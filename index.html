@@ -46,9 +46,9 @@
             <div class="form-group container mb-0">
                 <div class="input-group">
                     <select class="custom-select" v-model="selectedProgram"
-                            :disabled="Object.keys(programs).length === 0">
-                        <option v-for="(program, name) in programs" :value="name">
-                            {{ name }}
+                            :disabled="programs.length === 0">
+                        <option v-for="(n, i) in programs.length" :value="programs.key(i)">
+                            {{ programs.key(i) }}
                         </option>
                     </select>
                     <div class="input-group-append">
