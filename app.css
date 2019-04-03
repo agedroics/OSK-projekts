@@ -1,0 +1,28 @@
+html {
+    font-size: 16px;
+}
+[v-cloak] {
+    display: none !important;
+}
+.icon {
+    width: 1rem;
+    margin-right: .5rem;
+    text-align: center
+}
+.btn-control {
+    min-width: 38px;
+}
+.state-btn-group button {
+    width: 20%;
+    padding-left: .25rem;
+    padding-right: .25rem;
+}
+#editor-wrapper {
+    min-height: 250px;
+    height: calc(80vh - 300px);
+    overflow: hidden;
+}
+#editor {
+    height: 100%;
+    font-size: 14px;
+}

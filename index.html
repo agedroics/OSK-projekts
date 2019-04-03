@@ -5,36 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css">
-    <style type="text/css">
-        html {
-            font-size: 16px;
-        }
-        [v-cloak] {
-            display: none !important;
-        }
-        .icon {
-            width: 1rem;
-            margin-right: .5rem;
-            text-align: center
-        }
-        .btn-control {
-            min-width: 38px;
-        }
-        .state-btn-group button {
-            width: 20%;
-            padding-left: .25rem;
-            padding-right: .25rem;
-        }
-        #editor-wrapper {
-            min-height: 250px;
-            height: calc(80vh - 300px);
-            overflow: hidden;
-        }
-        #editor {
-            height: 100%;
-            font-size: 14px;
-        }
-    </style>
+    <link rel="stylesheet" type="text/css" href="app.css">
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.slim.min.js"></script>
     <script type="text/javascript" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.3/ace.js"></script>
@@ -125,8 +96,10 @@
                                         @click="toRunning(process)">
                                     Ru
                                 </button>
-                                <button type="button" class="btn" title="Waiting" disabled
-                                        :class="process.state === State.WAITING ? 'btn-primary' : 'btn-outline-secondary'">
+                                <button type="button" class="btn" title="Waiting"
+                                        :class="process.state === State.WAITING ? 'btn-primary' : 'btn-outline-secondary'"
+                                        :disabled="process.state !== State.RUNNING"
+                                        @click="computer.toWaiting(process.pid)">
                                     W
                                 </button>
                                 <button type="button" class="btn" title="Terminated"
