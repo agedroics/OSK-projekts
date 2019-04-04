@@ -53,7 +53,7 @@ Process.prototype.setFlags = function(unsignedResult, signedResult) {
     this.setFlag(Flag.OF, (signedResult | 0) !== signedResult);
 };
 
-// All arithmetic must be done through this functins to set the correct flags
+// All arithmetic must be done through this function to set the correct flags
 Process.prototype.doArithmetic = function(f) {
     var unsignedArgs = [];
     var signedArgs = [];
