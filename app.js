@@ -848,6 +848,31 @@ TempStorage.prototype.key = function(index) {
         created: function() {
             this.speed = 1;
             this.programs.setItem("init", this.computer.initProgram.code);
+            this.programs.setItem("running -> ready",
+                "mov ecx, 5\n" +
+                "body:\n" +
+                "loop body\n" +
+                "mov eax, 9Eh\n" +
+                "int 80h\n" +
+                "mov ecx, 5\n" +
+                "body2:\n" +
+                "loop body2"
+            )
+            this.programs.setItem("running -> waiting",
+                "mov eax, 2\n" +
+                "int 80h\n" +
+                "cmp eax, 0\n" +
+                "loope child\n\n" +
+                "mov eax, 7\n" +
+                "mov ebx, -1\n" +
+                "int 80h\n" +
+                "mov eax, 1\n" +
+                "int 80h\n\n" +
+                "child:\n" +
+                "mov ecx, 5\n" +
+                "loop_body:\n" +
+                "loop loop_body"
+            )
             this.selectedProgram = "init";
             this.computer.addCpu();
         },
