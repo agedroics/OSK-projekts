@@ -1,5 +1,6 @@
 "use strict";
 
+// Enumeration of all states
 var State = {
     NEW: "NEW",
     READY: "READY",
@@ -8,6 +9,7 @@ var State = {
     TERMINATED: "TERMINATED"
 };
 
+// Enumeration of all flags
 var Flag = {
     CF: 0x0001,
     ZF: 0x0040,
@@ -51,6 +53,7 @@ Process.prototype.setFlags = function(unsignedResult, signedResult) {
     this.setFlag(Flag.OF, (signedResult | 0) !== signedResult);
 };
 
+// All arithmetic must be done through this functins to set the correct flags
 Process.prototype.doArithmetic = function(f) {
     var unsignedArgs = [];
     var signedArgs = [];
@@ -72,6 +75,7 @@ function Program(code, instructions, labels) {
     this.labels = labels;
 }
 
+// All operand types for programs
 var Operand = {
     Register: function(value) {
         this.value = value.toLowerCase();
@@ -174,6 +178,8 @@ function Shift(mnemonic) {
     };
 }
 
+
+// Instruction definitions for compilation
 var Instruction = {
     mov: {
         operands: [Operand.Register, [Operand.Register, Operand.Immediate]],
@@ -296,6 +302,8 @@ Instruction.jne = Instruction.jnz;
 Instruction.loope = Instruction.loopz;
 Instruction.loopne = Instruction.loopnz;
 
+// Function for compiling code
+// Throws exception on syntax errors
 Program.compile = function(code) {
     var lines = code.split("\n");
     var regex = /^\s*(?:([a-z_]\w*):)?\s*(?:([a-z]+)\s*(?:\s((?:[^\s,;]+)(?:\s*,\s*(?:[^\s,;]+))*)\s*)?)?(?:;.*)?$/i;
@@ -486,6 +494,7 @@ Computer.prototype.removeCpu = function() {
     Vue.delete(this.cpus, cpu);
 };
 
+// === PROCESS STATE TRANSITIONS ===
 Computer.prototype.toNew = function(process) {
     if (process.state) {
         throw new Error("Invalid state transition: " + process.state + " => " + State.NEW);
@@ -578,6 +587,7 @@ Computer.prototype.toTerminated = function(pid) {
     }
 };
 
+// === SYSCALLS ===
 Computer.prototype.fork = function(pid) {
     var process = this.processes[pid];
     var forkedProcess = new Process(this.pidCounter++, pid, process.program);
@@ -680,6 +690,11 @@ Computer.prototype.sysCall = function(pid) {
     }
 };
 
+/* Cycle:
+    set NEW processes to READY
+    execute the next instruction for RUNNING processes
+    run scheduler
+*/
 Computer.prototype.doCycle = function() {
     var self = this;
     for (var pid in this.processes) {
@@ -706,6 +721,7 @@ Computer.prototype.doCycle = function() {
     this.scheduler.run(this);
 };
 
+// === UTILITY FUNCTIONS ===
 Computer.prototype.getFreeCpu = function() {
     for (var cpu in this.cpus) {
         if (this.cpus[cpu].pid === null) {
@@ -749,6 +765,7 @@ TempStorage.prototype.key = function(index) {
     var editor = null;
     var intervalId = null;
 
+    // === VUE APP ===
     new Vue({
         el: "#app",
         data: {
